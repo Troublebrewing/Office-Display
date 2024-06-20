@@ -1,0 +1,273 @@
+//Opening comments
+// USE AT&F 1 command to erase all files on module
+// USE AT+RUN "$autorun" to run this application
+//*****************
+//Includes
+//*****************
+
+//*****************
+//Global Variables
+//*****************
+// Display resolution
+#define EPD_WIDTH       800//600
+#define EPD_HEIGHT      480//448
+#define DISPLAY_CS_GPIO_NUMBER      12  //SIO_12
+#define DISPLAY_DC_GPIO_NUMBER      26  //SIO_26
+#define DISPLAY_RESET_GPIO_NUMBER   27  //SIO_27
+#define DISPLAY_BUSY_GPIO_NUMBER    11  //SIO_11
+#define DISPLAY_DO_GPIO_NUMBER      40  //SIO_40
+#define DISPLAY_CLK_GPIO_NUMBER     41  //SIO_41
+
+#define DISPLAY_REFRESH_TIME        10000
+
+DIM rc
+DIM h   //handle
+DIM rl  //readlen
+DIM rd$ ,wr$,p$
+DIM wren
+
+//*****************
+//Subroutines and Functions
+//*****************
+SUB Delay(ms) 
+    dim tn : tn = GetTickCount() 
+    
+    while (GetTickSince(tn)<ms)
+    endwhile
+ENDSUB
+
+SUB SendCommand()
+    GpioWrite(DISPLAY_DC_GPIO_NUMBER,0)
+    GpioWrite(DISPLAY_CS_GPIO_NUMBER,0)
+    rd$=""
+    rc=SpiWrite(wr$)
+    GpioWrite(DISPLAY_CS_GPIO_NUMBER,1)
+ENDSUB
+
+SUB SendData()
+    GpioWrite(DISPLAY_DC_GPIO_NUMBER,1)
+    GpioWrite(DISPLAY_CS_GPIO_NUMBER,0)
+    rd$="" 
+    rc=SpiWrite(wr$)
+    GpioWrite(DISPLAY_CS_GPIO_NUMBER,1)
+ENDSUB
+
+SUB Wait_Until_Busy_High()
+    //dim busy
+    //DO
+    //    busy = GpioRead(DISPLAY_BUSY_GPIO_NUMBER)
+    //UNTIL(busy == 1)
+    Delay(1)
+    while(!GpioRead(DISPLAY_BUSY_GPIO_NUMBER))
+        Delay(1)
+    endwhile
+ENDSUB
+
+SUB Wait_Until_Busy_Low()
+    //dim busy
+    //DO
+    //    busy = GpioRead(DISPLAY_BUSY_GPIO_NUMBER)
+    //UNTIL(busy == 0)
+    Delay(1)
+    while(GpioRead(DISPLAY_BUSY_GPIO_NUMBER))
+        Delay(1)
+    endwhile
+ENDSUB
+
+SUB ResetPulse()
+    GpioWrite(DISPLAY_RESET_GPIO_NUMBER,1)
+    Delay(20)
+    GpioWrite(DISPLAY_RESET_GPIO_NUMBER,0) //module reset    
+    Delay(2)
+    GpioWrite(DISPLAY_RESET_GPIO_NUMBER,1) 
+    Delay(20)  
+ENDSUB
+
+SUB PowerOnDisplay()
+    wr$ = "\04" : SendCommand()
+    Wait_Until_Busy_High()
+ENDSUB
+
+SUB PowerOffDisplay()
+    wr$ = "\02" : SendCommand()
+    wr$ = "\00" : SendData()
+    Wait_Until_Busy_High()
+ENDSUB
+
+SUB RefreshDisplay()
+    PowerOnDisplay()
+    wr$ = "\12" : SendCommand()
+    wr$ = "\00" : SendData()
+    Delay(1)
+    Wait_Until_Busy_High()
+ENDSUB
+
+SUB HibernateDisplay()  //deep sleep/hibernate display
+    wr$ = "\07" : SendCommand()
+    wr$ = "\A5" : SendData()
+    Delay(10)
+    Wait_Until_Busy_High()
+ENDSUB
+
+SUB InitDisplay565()
+    ResetPulse()
+    Wait_Until_Busy_High()
+    wr$ = "\00" : SendCommand() // panel setting register
+    wr$ = "\EF\08" : SendData() // "\EF\08"
+    wr$ = "\01" : SendCommand() // power setting register
+    wr$ = "\37\00\00\23\23" : SendData()    //"\37\00\00\00\00"
+    wr$ = "\03" : SendCommand() // power off sequence setting register
+    wr$ = "\00" : SendData()
+    wr$ = "\06" : SendCommand() // booster soft start
+    wr$ = "\C7\C7\1D" : SendData()
+    wr$ = "\30" : SendCommand() // PLL control
+    wr$ = "\3C" : SendData()    // 50hz
+    wr$ = "\41" : SendCommand() // Temp sensor enable
+    wr$ = "\00" : SendData()    // ??
+    wr$ = "\50" : SendCommand() //VCOM and Data interval
+    wr$ = "\37" : SendData()    //white border
+    wr$ = "\60" : SendCommand() // ??
+    wr$ = "\22" : SendData()    // ??
+    wr$ = "\61" : SendCommand() //resolution
+    wr$ = "\02\58\01\C0" : SendData()   // 600 x 448
+    wr$ = "\E3" : SendCommand() // ??
+    wr$ = "\AA" : SendData()    // ??
+
+    Delay(100)
+    wr$ = "\50" : SendCommand() //VCOM and Data interval
+    wr$ = "\00" : SendData()    //37
+
+    PowerOnDisplay()
+
+    print "\nDisplay Initialized\n"
+ENDSUB
+
+SUB InitDisplay73()
+    ResetPulse()
+    Delay(20)
+    Wait_Until_Busy_High()
+
+    wr$ = "\AA" : SendCommand()//CMDH
+    wr$ = "\49\55\20\08\09\18" : SendData()
+
+    wr$ = "\01" : SendCommand()//PWRR
+    wr$ = "\3F\00\32\2A\0E\2A" : SendData()
+
+    wr$ = "\00" : SendCommand()//PSR
+    wr$ = "\5F\69" : SendData()
+
+    wr$ = "\03" : SendCommand()//POFS
+    wr$ = "\00\54\00\44" : SendData()
+
+    wr$ = "\05" : SendCommand()//BTST1
+    wr$ = "\40\1F\1F\2C" : SendData()
+    
+    wr$ = "\06" : SendCommand()//BTST2
+    wr$ = "\6F\1F\1F\22" : SendData()
+
+    wr$ = "\08" : SendCommand()//BTST3
+    wr$ = "\6F\1F\1F\22" : SendData()
+
+    wr$ = "\13" : SendCommand()//IPC
+    wr$ = "\00\04" : SendData()
+    
+    wr$ = "\30" : SendCommand()//PLL
+    wr$ = "\3C" : SendData()
+    
+    wr$ = "\41" : SendCommand()//TSE
+    wr$ = "\00" : SendData()
+    
+    wr$ = "\50" : SendCommand()//CDI
+    wr$ = "\3F" : SendData()
+    
+    wr$ = "\60" : SendCommand()//TCON
+    wr$ = "\02\00" : SendData()
+    
+    wr$ = "\61" : SendCommand()//TRES
+    wr$ = "\03\20\01\E0" : SendData()
+    
+    wr$ = "\82" : SendCommand()//VDCS
+    wr$ = "\1E" : SendData()
+    
+    wr$ = "\84" : SendCommand()//T_VDCS
+    wr$ = "\00" : SendData()
+    
+    wr$ = "\86" : SendCommand()//AGID
+    wr$ = "\00" : SendData()
+    
+    wr$ = "\E3" : SendCommand()//PWS
+    wr$ = "\2F" : SendData()
+    
+    wr$ = "\E0" : SendCommand()//CCSET
+    wr$ = "\00" : SendData()
+    
+    wr$ = "\E6" : SendCommand()//TSSET
+    wr$ = "\00" : SendData()
+ENDSUB
+
+SUB WriteScreenBuffer()
+    wr$ = "\10" : SendCommand()     //start data
+    GpioWrite(DISPLAY_DC_GPIO_NUMBER,1)
+    GpioWrite(DISPLAY_CS_GPIO_NUMBER,0)
+    rd$="" 
+    DIM i AS INTEGER
+    FOR i=0 TO ((EPD_WIDTH*EPD_HEIGHT)/2)
+        wr$ = "\44"
+        rc=SpiWrite(wr$)
+    NEXT    
+    GpioWrite(DISPLAY_CS_GPIO_NUMBER,1)
+ENDSUB
+
+SUB ClearDisplay()
+    print "Writing screen buffer..."
+    WriteScreenBuffer()
+    print "done\n"
+    
+    print "Powering on display..."
+    PowerOnDisplay()
+    print "done\n"
+    
+    print "Refreshing display..."
+    RefreshDisplay()
+    print "done\n"
+    
+    print "Powering off display..."
+    PowerOffDisplay()
+    print "done\n"
+    
+ENDSUB
+
+//*****************
+//Event and Error handlers
+//*****************
+
+//*****************
+//main program
+//*****************
+rc= GpioSetFunc(DISPLAY_CS_GPIO_NUMBER,2,1)         //output
+rc= GpioSetFunc(DISPLAY_DC_GPIO_NUMBER,2,1)         //output
+rc= GpioSetFunc(DISPLAY_RESET_GPIO_NUMBER,2,1)      //output
+rc= GpioSetFunc(DISPLAY_BUSY_GPIO_NUMBER,1,2)       //input, weak pull-up
+rc= GpioSetFunc(DISPLAY_DO_GPIO_NUMBER,2,1)         //output
+rc= GpioSetFunc(DISPLAY_CLK_GPIO_NUMBER,2,1)        //output
+
+//pinMode(CS_PIN, OUTPUT);
+//pinMode(RST_PIN, OUTPUT);
+//pinMode(DC_PIN, OUTPUT);
+//pinMode(BUSY_PIN, INPUT); 
+//SPI.begin();
+//SPI.beginTransaction(SPISettings(2000000, MSBFIRST, SPI_MODE0));
+
+print "Opening SPI port..."
+rc=SpiOpen(0,2000000,0,h)
+print "done\n"
+//InitDisplay565()
+
+print "Initializing display..."
+InitDisplay73()
+Delay(100)
+print "done\n"
+
+ClearDisplay()
+
+SpiClose(h)
