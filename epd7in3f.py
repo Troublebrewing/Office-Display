@@ -29,7 +29,7 @@
 #
 
 import logging
-from . import epdconfig
+#import epdconfig
 
 import PIL
 from PIL import Image
@@ -42,55 +42,8 @@ EPD_HEIGHT      = 480
 logger = logging.getLogger(__name__)
 
 class EPD:
-    def __init__(self):
-        self.reset_pin = epdconfig.RST_PIN
-        self.dc_pin = epdconfig.DC_PIN
-        self.busy_pin = epdconfig.BUSY_PIN
-        self.cs_pin = epdconfig.CS_PIN
-        self.width = EPD_WIDTH
-        self.height = EPD_HEIGHT
-        self.BLACK  = 0x000000   #   0000  BGR
-        self.WHITE  = 0xffffff   #   0001
-        self.GREEN  = 0x00ff00   #   0010
-        self.BLUE   = 0xff0000   #   0011
-        self.RED    = 0x0000ff   #   0100
-        self.YELLOW = 0x00ffff   #   0101
-        self.ORANGE = 0x0080ff   #   0110
-        
-    # Hardware reset
-    def reset(self):
-        epdconfig.digital_write(self.reset_pin, 1)
-        epdconfig.delay_ms(20) 
-        epdconfig.digital_write(self.reset_pin, 0)         # module reset
-        epdconfig.delay_ms(2)
-        epdconfig.digital_write(self.reset_pin, 1)
-        epdconfig.delay_ms(20)   
-
-    def send_command(self, command):
-        epdconfig.digital_write(self.dc_pin, 0)
-        epdconfig.digital_write(self.cs_pin, 0)
-        epdconfig.spi_writebyte([command])
-        epdconfig.digital_write(self.cs_pin, 1)
-
-    def send_data(self, data):
-        epdconfig.digital_write(self.dc_pin, 1)
-        epdconfig.digital_write(self.cs_pin, 0)
-        epdconfig.spi_writebyte([data])
-        epdconfig.digital_write(self.cs_pin, 1)
-        
-    # send a lot of data   
-    def send_data2(self, data):
-        epdconfig.digital_write(self.dc_pin, 1)
-        epdconfig.digital_write(self.cs_pin, 0)
-        epdconfig.spi_writebyte2(data)
-        epdconfig.digital_write(self.cs_pin, 1)
-        
-    def ReadBusyH(self):
-        logger.debug("e-Paper busy H")
-        while(epdconfig.digital_read(self.busy_pin) == 0):      # 0: busy, 1: idle
-            epdconfig.delay_ms(5)
-        logger.debug("e-Paper busy H release")
-
+    width = EPD_WIDTH
+    height = EPD_HEIGHT
     def TurnOnDisplay(self):
         self.send_command(0x04) # POWER_ON
         self.ReadBusyH()
@@ -104,12 +57,7 @@ class EPD:
         self.ReadBusyH()
         
     def init(self):
-        if (epdconfig.module_init() != 0):
-            return -1
-        # EPD hardware init start
-        self.reset()
-        self.ReadBusyH()
-        epdconfig.delay_ms(30)
+        
 
         self.send_command(0xAA)    # CMDH
         self.send_data(0x49)
@@ -212,7 +160,9 @@ class EPD:
             logger.warning("Invalid image dimensions: %d x %d, expected %d x %d" % (imwidth, imheight, self.width, self.height))
 
         # Convert the soruce image to the 7 colors, dithering if needed
+        image_temp.save("full_color.bmp")
         image_7color = image_temp.convert("RGB").quantize(palette=pal_image)
+        image_7color.save("7color.bmp")
         buf_7color = bytearray(image_7color.tobytes('raw'))
 
         # PIL does not support 4 bit color, so pack the 4 bits of color
@@ -241,7 +191,6 @@ class EPD:
         self.send_command(0x07) # DEEP_SLEEP
         self.send_data(0XA5)
         
-        epdconfig.delay_ms(2000)
-        epdconfig.module_exit()
+
 ### END OF FILE ###
 

@@ -8,6 +8,9 @@ from gcsa.event import Event
 from gcsa.google_calendar import GoogleCalendar
 from gcsa.recurrence import Recurrence, DAILY, SU, SA
 
+import epd7in3f
+import time
+
 status = "Available"
 display_width = 800
 display_height = 480
@@ -15,15 +18,16 @@ display_height = 480
 im = Image.new(mode="RGB", size=(display_width,display_height), color="white")
 
 im2 = ImageDraw.Draw(im)
+im2.fontmode = "1"  #turns off anti aliasing. quantization gets weird if this is on
 
 #colors
 bordercolor = "white"
 if status == "Focus":
-    bordercolor = "yellow"
+    bordercolor = 0xFFFF00
 if status == "Busy":
-    bordercolor = "red"
+    bordercolor = 0xFF0000
 if status == "Available":
-    bordercolor = "green"
+    bordercolor = 0x00FF00
 
 #outline
 borderwidth = 20
@@ -38,10 +42,10 @@ im2.text((borderwidth+padding, padding+borderwidth), now.strftime("%x %I:%M %p")
 
 # battery
 
-#dixon logo
 dixon_logo = Image.open("Dixon Logo.png")
 aspect_ratio = dixon_logo.width / dixon_logo.height
-if status != "Away":    
+if status != "Away":  
+    #dixon logo  
     logo_height = 220
     dixon_logo = dixon_logo.resize((logo_height,int(logo_height/aspect_ratio)))
     #im2.bitmap((borderwidth+padding+380, borderwidth+padding), dixon_logo, fill="blue")
@@ -92,21 +96,21 @@ else:
     #im2.bitmap((borderwidth+padding+380, borderwidth+padding), dixon_logo, fill="blue")
     im.paste(dixon_logo,(0, 100),dixon_logo)
 
-waveshare_pallete = [0,0,0,255,255,255,0,128,0,0,0,255,255,0,0,255,255,0,255,170,0]
-waveshare_pallete2 = [
-    0x000000,  # Black
-    0xFFFFFF,  # White
-    0x00FF00,  # Green
-    0x0000FF,  # Blue
-    0xFF0000,  # Red
-    0xFFFF00,  # Yellow
-    0xFF7D00,  # Orange
-]
-arbitrary_size = 16, 16
-palimage = Image.new('P', arbitrary_size)
-palimage.putpalette(waveshare_pallete)
+#waveshare_pallete = [0,0,0,255,255,255,0,255,0,0,0,255,255,0,0,255,255,0,255,170,0]
+#waveshare_pallete2 = [
+#    0x000000,  # Black
+#    0xFFFFFF,  # White
+#    0x00FF00,  # Green
+#    0x0000FF,  # Blue
+#    0xFF0000,  # Red
+#    0xFFFF00,  # Yellow
+#    0xFF7D00,  # Orange
+#]
+#arbitrary_size = 16, 16
+#palimage = Image.new('P', arbitrary_size)
+#palimage.putpalette(waveshare_pallete)
 
-im.quantize(palette=palimage)
+#im.quantize(palette=palimage)
 
 #calendar = GoogleCalendar('tbules@dixonvalve.com')
 #for event in calendar.get_events():
@@ -114,14 +118,29 @@ im.quantize(palette=palimage)
 
 #im.show()
 
-pcp = serial.Serial('COM5', 115200, 8, "N", 1, timeout=10)
+epd = epd7in3f.EPD()
+wavesharebuf = epd.getbuffer(im)
+
+pcp = serial.Serial('COM5', 115200, 8, "N", 1, timeout=10, rtscts=1)
 
 #pcp.dtr(0)
-mystring = """AT+RUN "$autorun"\r\n"""
-pcp.write(mystring.encode())
+test = 0
+if(test == 0):
+    mystring = """AT+RUN "$autorun"\r\n"""
+    pcp.write(mystring.encode())
 
-response = pcp.read(100)
+    time.sleep(1)
 
-response_char = response.decode()
+    print("Sending image through serial port...")
+    pcp.write(wavesharebuf)
+    print("done\n")
 
-print(response_char)
+
+#test_data = [0x00, 0x01, 0x02, 0x03, 0x04, 0x03, 0x02, 0x01]
+#pcp.write(test_data)
+
+response = pcp.read(150)
+
+#response_char = response.decode()
+
+#print(response_char)

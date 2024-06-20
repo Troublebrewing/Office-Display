@@ -245,19 +245,21 @@ DIM strLength, str$
 
 FUNCTION HndlrUartRx()
     //if timer not running
-    //wr$ = "\10" : SendCommand()     //start data
-    //GpioWrite(DISPLAY_DC_GPIO_NUMBER,1)
-    //GpioWrite(DISPLAY_CS_GPIO_NUMBER,0)
+    if TimerRunning(0) == 0 THEN
+        wr$ = "\10" : SendCommand()     //start data
+        GpioWrite(DISPLAY_DC_GPIO_NUMBER,1)
+        GpioWrite(DISPLAY_CS_GPIO_NUMBER,0)
+    ENDIF
 
-    print "Data has arrived\n"
+    //print "Data has arrived\n"
     strLength = UartRead(display_data$) //get data from Uart buffer
 
     TimerCancel(0)              //restart timeout
     TimerStart(0,2000,0)        //restart timeout
 
-    //rc=SpiWrite(display_data$)  //send data to display
+    rc=SpiWrite(display_data$)  //send data to display
 
-    strLength = UartWrite(display_data$)    //loopback
+    //strLength = UartWrite(display_data$)    //loopback
     display_data$ = ""          //clear buffer
 ENDFUNC 1
 
@@ -266,21 +268,21 @@ FUNCTION Btn1Pressed()
 ENDFUNC 0
 
 FUNCTION UartRxTimeout()
-    //GpioWrite(DISPLAY_CS_GPIO_NUMBER,1) //release chip select
+    GpioWrite(DISPLAY_CS_GPIO_NUMBER,1) //release chip select
 
     print "Uart Reception done. Updating display now...\n"
 
-    //print "Powering on display..."
-    //PowerOnDisplay()
-    //print "done\n"
+    print "Powering on display..."
+    PowerOnDisplay()
+    print "done\n"
     
-    //print "Refreshing display..."
-    //RefreshDisplay()
-    //print "done\n"
+    print "Refreshing display..."
+    RefreshDisplay()
+    print "done\n"
     
-    //print "Powering off display..."
-    //PowerOffDisplay()
-    //print "done\n"
+    print "Powering off display..."
+    PowerOffDisplay()
+    print "done\n"
 ENDFUNC 1
 
 //*****************
@@ -308,7 +310,7 @@ rc = GpioSetFunc(BUTTON4_GPIO,1,4)
 
 rc = GPIOBindEvent(0,BUTTON3_GPIO,1)
 rc = GPIOBindEvent(1,BUTTON4_GPIO,1)
-print "press Button 0 to exit this application\n"
+//print "press Button 0 to exit this application\n"
 
 ONEVENT EVUARTRX    CALL HndlrUartRx
 ONEVENT EVGPIOCHAN0 CALL Btn1Pressed
@@ -316,9 +318,9 @@ ONEVENT EVTMR0      CALL UartRxTimeout
 
 UartClose()
 
-print "opening Uart..."
+//print "opening Uart..."
 rc = UartOpen(115200,32,128,"CN81H")
-print "done\n"
+//print "done\n"
 
 print "Opening SPI port..."
 rc=SpiOpen(0,2000000,0,h)
