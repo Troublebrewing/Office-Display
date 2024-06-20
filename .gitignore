@@ -6,3 +6,8 @@
 /UwFlashX_v1.00_Windows
 /UwFlashX_v1.00_Windows_SSL
 /UwTerminalX_v1.17_Windows
+*.zip
+*.pdf
+E-Paper_code.7z
+*.uwc
+spi.example.sb
