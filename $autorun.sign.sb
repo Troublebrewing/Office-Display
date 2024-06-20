@@ -110,39 +110,6 @@ SUB HibernateDisplay()  //deep sleep/hibernate display
     Wait_Until_Busy_High()
 ENDSUB
 
-SUB InitDisplay565()
-    ResetPulse()
-    Wait_Until_Busy_High()
-    wr$ = "\00" : SendCommand() // panel setting register
-    wr$ = "\EF\08" : SendData() // "\EF\08"
-    wr$ = "\01" : SendCommand() // power setting register
-    wr$ = "\37\00\00\23\23" : SendData()    //"\37\00\00\00\00"
-    wr$ = "\03" : SendCommand() // power off sequence setting register
-    wr$ = "\00" : SendData()
-    wr$ = "\06" : SendCommand() // booster soft start
-    wr$ = "\C7\C7\1D" : SendData()
-    wr$ = "\30" : SendCommand() // PLL control
-    wr$ = "\3C" : SendData()    // 50hz
-    wr$ = "\41" : SendCommand() // Temp sensor enable
-    wr$ = "\00" : SendData()    // ??
-    wr$ = "\50" : SendCommand() //VCOM and Data interval
-    wr$ = "\37" : SendData()    //white border
-    wr$ = "\60" : SendCommand() // ??
-    wr$ = "\22" : SendData()    // ??
-    wr$ = "\61" : SendCommand() //resolution
-    wr$ = "\02\58\01\C0" : SendData()   // 600 x 448
-    wr$ = "\E3" : SendCommand() // ??
-    wr$ = "\AA" : SendData()    // ??
-
-    Delay(100)
-    wr$ = "\50" : SendCommand() //VCOM and Data interval
-    wr$ = "\00" : SendData()    //37
-
-    PowerOnDisplay()
-
-    print "\nDisplay Initialized\n"
-ENDSUB
-
 SUB InitDisplay73()
     ResetPulse()
     Delay(20)
@@ -333,9 +300,5 @@ Delay(100)
 print "done\n"
 
 WAITEVENT
-
-
-
-ClearDisplay()
 
 SpiClose(h)
