@@ -1,19 +1,38 @@
+#libraries for image compositing
 from PIL import Image
 from PIL import ImageDraw
 from PIL import ImageFont
 
+#library to pack image data for waveshare display
+#this is from the rpi library from the display manufacturer
+import epd7in3f
+
+#libraries for various time functions
 import datetime
 from pytz import timezone
 import pytz
-import serial
+import time
+import schedule
 
+#libraries for retrieving google calendar
 from gcsa.event import Event
 from gcsa.google_calendar import GoogleCalendar
 from gcsa.recurrence import Recurrence, DAILY, SU, SA
 
-import epd7in3f
-import time
-import schedule
+import asyncio
+from bleak import BleakClient, BleakScanner
+import serial
+
+#cairo has some external dependencies
+import os
+folder_path = os.path.abspath("./cairo/bin/")
+path_env_var = os.environ["PATH"]
+if folder_path not in path_env_var:
+    os.environ["PATH"] = folder_path + os.pathsep + path_env_var
+
+#import these libraries for svg conversion
+from svglib.svglib import svg2rlg
+from reportlab.graphics import renderPM
 
 REFRESH_PERIOD_MINUTES = 5
 
@@ -36,8 +55,7 @@ def make_image(focus_event, in_event):
     im2 = ImageDraw.Draw(im)
     im2.fontmode = "1"  #turns off text anti aliasing. quantization gets weird if this is on
 
-    #colors
-                 #0xBBGGRR
+    #colors      #0xBBGGRR
     EPD_BLACK   = 0x000000
     EPD_WHITE   = 0xFFFFFF
     EPD_GREEN   = 0x00FF00
@@ -64,24 +82,37 @@ def make_image(focus_event, in_event):
     now = datetime.datetime.now()
     #print(now)
     #date
-    #timestring = now.strftime("%x %I:%M %p")
-    timestring = now.strftime("%x %I:%Mish")
+    #timestring = now.strftime("%x Last Updated: %I:%M %p")
+    timestring = now.strftime("%x")
     im2.text((borderwidth+padding, padding+borderwidth), timestring, font=timefont, fill=(0, 0, 0))
 
     # battery
 
-    badge = Image.open("badge.png")
-    aspect_ratio = badge.width / badge.height
+    try:
+        vector_badge = svg2rlg("badge.svg")
+        renderPM.drawToFile(vector_badge, "badge.png", fmt="PNG", dpi=100)
+    except:
+        print("unable to create badge from vector image")
+
+    try:
+        badge = Image.open("badge.png")
+        aspect_ratio = badge.width / badge.height
+    except:
+        print("no badge image file found")
+    
     if status != "Away":  
         #badge
-        if badge.height > badge.width:
-            #portrait image. scale via height
-            max_logo_height = 190
-            badge = badge.resize((int(max_logo_height * aspect_ratio),max_logo_height))
-        else:
-            #landscape image. scale via width
-            max_logo_width = 220
-            badge = badge.resize((max_logo_width,int(max_logo_width/aspect_ratio)))
+        try:
+            if badge.height > badge.width:
+                #portrait image. scale via height
+                max_logo_height = 190
+                badge = badge.resize((int(max_logo_height * aspect_ratio),max_logo_height))
+            else:
+                #landscape image. scale via width
+                max_logo_width = 220
+                badge = badge.resize((max_logo_width,int(max_logo_width/aspect_ratio)))
+        except:
+            print("skipping badge")
 
         #dixon_logo = dixon_logo.resize((logo_height,int(logo_height/aspect_ratio)))
         #im2.bitmap((borderwidth+padding+380, borderwidth+padding), dixon_logo, fill="blue")
@@ -148,10 +179,6 @@ def make_image(focus_event, in_event):
     return im
 
 def GetFocusEvent(todays_events):
-    #dummy_time_start = datetime.datetime.now() + datetime.timedelta(days=1)
-    #dummy_time_end  = datetime.datetime.now() + datetime.timedelta(days=2)
-    #focus_event = Event("Focus Event", start=dummy_time_start,end=dummy_time_end)
-
     focus_event = None
 
     for event in todays_events:
@@ -169,6 +196,9 @@ def GetFocusEvent(todays_events):
         #print(event.summary+" "+start_string+"-"+end_string)
 
         if(isinstance(event.start,datetime.datetime) & isinstance(event.end,datetime.datetime)):
+            if focus_event is None:
+                focus_event = event
+
             utcnow = datetime.datetime.now(datetime.UTC)
             now_local = utcnow.astimezone(timezone('US/Eastern'))
             
@@ -195,7 +225,7 @@ def In_event(event):
     return in_event
 
 def UpdateDisplay():
-    UpdateEvents()
+    UpdateEventList()
     
     print("Updating Display...")
     
@@ -220,32 +250,89 @@ def UpdateDisplay():
         print("done\n")
 
 
-def UpdateEvents():
+def UpdateEventList():
     print("Fetching latest events...")
     tomorrow_date = datetime.date.today() + datetime.timedelta(days=1)
     global todays_events
-    global calendar
-    todays_events = calendar.get_events(time_min=datetime.datetime.now(), time_max=tomorrow_date)
+    
+    try:
+        calendar = GoogleCalendar('tbules@dixonvalve.com', save_token=False, authentication_flow_port=8081)
+        todays_events = list(calendar.get_events(time_min=datetime.datetime.now(), time_max=tomorrow_date))
+    except Exception as e:
+        print(f"unable to fetch events: {e}")
+        
+# Define a class to represent a BLE device
+class Device:
+    def __init__(self, name, address, services):
+        self.name = name
+        self.address = address
+        self.services = services
 
-from svglib.svglib import svg2rlg
+# Define a function to scan for BLE devices
+async def scan_for_devices():
+    devices_found = []
+    try:
+        print("Scanning for BLE devices...")
+        devices = await BleakScanner.discover()
+        print(f"Found {len(devices)} devices.")
 
-import os
-folder_path = os.path.abspath("./cairo/bin/")
-path_env_var = os.environ["PATH"]
-if folder_path not in path_env_var:
-    os.environ["PATH"] = folder_path + os.pathsep + path_env_var
+        for device in devices:
+            if str(device.name) != "None":
+                services = device.metadata.get("uuids", [])
+                devices_found.append(
+                    Device(
+                        str(device.name + "\n" + device.address),
+                        str(device.address),
+                        services,
+                    )
+                )
 
-from reportlab.graphics import renderPM
-import io
+        print("Scan complete.")
+        return devices_found
 
-vector_badge = svg2rlg("badge.svg")
-place_holder = io.BytesIO()
-#renderPM.drawToFile(vector_badge, place_holder, fmt="PNG")
-renderPM.drawToFile(vector_badge, "badge.png", fmt="PNG", dpi=100,)
-#place_holder.show()
+    except Exception as e:
+        print(f"Error during scan: {e}")
+        return []
 
-#import cairosvg 
-#cairosvg.svg2png(file_obj=open("/badge.svg",'r'),output_width=200, write_to="badge.png")
+# Define an async function to send a message to the device
+async def send_message_to_device(message):
+    try:
+        # Check message length
+        if len(message) <= 20:
+            # Pad spaces if message is shorter than 20 bytes
+            message = message.ljust(20)
+            # Check if the BleakClient object is available globally
+            if "client" in globals():
+                # Check if the client is connected
+                if client.is_connected:
+                    # Encode the message string to bytes before sending
+                    message_bytes = message.encode()
+                    # Send the message to the RXUUID of the Bluetooth device
+                    await client.write_gatt_char(
+                        RX_UUID, message_bytes, response=True
+                    )
+                    return  # Exit function after successful transmission
+                else:
+                    print("Device is not connected.")
+                    open_dlg_modal()
+                    page.update()
+
+            else:
+                print("BleakClient object not available.")
+        else:
+            # Print error message to chat log under system user
+            error_message = Message(
+                "System",
+                "Error: Message cannot exceed 20 bytes",
+                message_type="system_message",
+            )
+            chat.controls.append(ChatMessage(error_message))
+            page.update()
+            print("Error: Message cannot exceed 20 bytes.")
+    except Exception as e:
+        print(f"Error sending message to device: {e}")
+        open_dlg_modal()
+        page.update()
 
 epd = epd7in3f.EPD()
 
@@ -257,14 +344,13 @@ if(test == 0):
     pcp.write(mystring.encode())
     time.sleep(1)
 
-calendar = GoogleCalendar('tbules@dixonvalve.com', save_token=True, authentication_flow_port=8081)
 
 utc = pytz.UTC
 
-#UpdateEvents()
+#UpdateEventList()
 UpdateDisplay()
 
-#schedule.every(15).minutes.do(UpdateEvents)
+#schedule.every(15).minutes.do(UpdateEventList)
 schedule.every(5).minutes.do(UpdateDisplay)
 
 while(True):
