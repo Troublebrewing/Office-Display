@@ -36,15 +36,15 @@ from reportlab.graphics import renderPM
 
 REFRESH_PERIOD_MINUTES = 5
 
-def make_image(focus_event, in_event):
-    
+def make_image(focus_event):
+    in_event = In_event(focus_event)
+
     if(in_event):
         if(focus_event.summary == "Focus time"):
             status = "Focus"
         else:
             status = "Busy"
-
-    if(not in_event):
+    else:
         status = "Available"
     
     display_width = 800
@@ -181,34 +181,37 @@ def make_image(focus_event, in_event):
 def GetFocusEvent(todays_events):
     focus_event = None
 
-    for event in todays_events:
-        #start_string = ""
-        #if(isinstance(event.start, datetime.date)):
-        #    start_string = event.start.strftime("%Y-%m-%d")
-        #if(isinstance(event.start,datetime.datetime)):
-        #    start_string = event.start.strftime("%Y-%m-%d %H:%M:%S")
-        
-        #end_string = ""
-        #if(isinstance(event.end, datetime.date)):
-        #    end_string = event.end.strftime("%Y-%m-%d")
-        #if(isinstance(event.end,datetime.datetime)):
-        #    end_string = event.end.strftime("%Y-%m-%d %H:%M:%S")
-        #print(event.summary+" "+start_string+"-"+end_string)
-
-        if(isinstance(event.start,datetime.datetime) & isinstance(event.end,datetime.datetime)):
-            if focus_event is None:
-                focus_event = event
-
-            utcnow = datetime.datetime.now(datetime.UTC)
-            now_local = utcnow.astimezone(timezone('US/Eastern'))
+    try:
+        for event in todays_events:
+            start_string = ""
+            if(isinstance(event.start, datetime.date)):
+                start_string = event.start.strftime("%Y-%m-%d")
+            if(isinstance(event.start,datetime.datetime)):
+                start_string = event.start.strftime("%Y-%m-%d %H:%M:%S")
             
-            if((now_local > event.start) & (now_local < event.end)):
-                focus_event = event
-                break
+            end_string = ""
+            if(isinstance(event.end, datetime.date)):
+                end_string = event.end.strftime("%Y-%m-%d")
+            if(isinstance(event.end,datetime.datetime)):
+                end_string = event.end.strftime("%Y-%m-%d %H:%M:%S")
+            print(event.summary+" "+start_string+"-"+end_string)
 
-            if(event.start < focus_event.start):
-                focus_event = event
+            if(isinstance(event.start,datetime.datetime) & isinstance(event.end,datetime.datetime)):
+                if focus_event is None:
+                    focus_event = event
 
+                utcnow = datetime.datetime.now(datetime.UTC)
+                now_local = utcnow.astimezone(timezone('US/Eastern'))
+                
+                if((now_local > event.start) & (now_local < event.end)):
+                    focus_event = event
+                    break
+
+                if(event.start < focus_event.start):
+                    focus_event = event
+    except:
+        return focus_event
+    
     return focus_event
 
 def In_event(event):
@@ -225,42 +228,108 @@ def In_event(event):
     return in_event
 
 def UpdateDisplay():
-    UpdateEventList()
+    #UpdateEventList()
     
-    print("Updating Display...")
+    timestring = datetime.datetime.now().strftime("%I:%M %p")
+    print(timestring+" Updating Display...")
     
-    #global todays_events
+    global focus_event
     global todays_events
-    focus_event = GetFocusEvent(todays_events)
-    
     try:
-        print("Focus Event:"+focus_event.summary)
+        _focus_event = GetFocusEvent(todays_events)
     except:
-        print("No focus event")
+        print("couldnt get focus event")
+        _focus_event = []
+
+    #check if focus event has changed
+    if(focus_event != _focus_event):
+        focus_event = _focus_event
+
+        #update display when focus event will change
+        #if In_event(focus_event):
+        #    next_update_time = focus_event.end.strftime("%I:%M")
+        #else:
+        #    next_update_time = focus_event.start.strftime("%I:%M")
+        #print(f"scheduling display update for {next_update_time}")
+        #schedule.every.day.at(next_update_time).do(UpdateDisplay)
+
+        try:
+            print("New Focus Event:"+focus_event.summary)
+        except:
+            print("No focus event")        
+
+        #create image to send
+        im = make_image(focus_event)
+
+        #show image
+        #im.show()
+
+        #encode into datastream for waveshare display
+        wavesharebuf = epd.getbuffer(im)
+
+        #if(test == 0):
+        print("Sending image through serial port...", end='')
+        pcp.write(wavesharebuf)
+        print("done")
+
+            #send_message_to_device(wavesharebuf)
+    else:
+        print(f"Focus event is still {focus_event.summary}. skipping...")
+
+    #schedule next display update
+    ScheduleNextUpdate(focus_event)    
+
+    return schedule.CancelJob
+    
+def ScheduleNextUpdate(focus_event):
+    
 
     in_event = In_event(focus_event)
 
-    im = make_image(focus_event, in_event)
-    #im.show()
-    wavesharebuf = epd.getbuffer(im)
+    # available
+    if(focus_event is not None):
+        if(in_event):
+            time_free_avail = focus_event.end.strftime("%I:%M %p")
+        else:
+            time_free_avail = focus_event.start.strftime("%I:%M %p")
+    
+    else:
 
-    if(test == 0):
-        print("Sending image through serial port...")
-        pcp.write(wavesharebuf)
-        print("done\n")
 
+    now_str = now.strftime('%H:%M')
+    
+    #print(f"runing run_once at: {now_str}")
+
+    # Get the current time
+    now = datetime.datetime.now()
+
+    # Add the random number of minutes to the current time
+    next_time = now + datetime.timedelta(minutes=5)
+
+    # Print the time in HH:MM format
+    next_time_str = next_time.strftime('%H:%M')
+
+    print(f"next run at: {next_time_str}")
+
+    schedule.every().day.at(next_time_str).do(UpdateDisplay)
+
+    return schedule.CancelJob
 
 def UpdateEventList():
-    print("Fetching latest events...")
+    print("Fetching latest events...", end='')
     tomorrow_date = datetime.date.today() + datetime.timedelta(days=1)
     global todays_events
     
     try:
-        calendar = GoogleCalendar('tbules@dixonvalve.com', save_token=False, authentication_flow_port=8081)
+        calendar = GoogleCalendar(credentials_path='.credentials/client_secret_107824529014-pggujlou2tr9hnva6oak0bf8o605lsll.apps.googleusercontent.com.json',default_calendar='tbules@dixonvalve.com', save_token=True, authentication_flow_port=8081)
         todays_events = list(calendar.get_events(time_min=datetime.datetime.now(), time_max=tomorrow_date))
+        print("done")
     except Exception as e:
-        print(f"unable to fetch events: {e}")
-        
+        print(f"failed{e}")
+
+    
+
+
 # Define a class to represent a BLE device
 class Device:
     def __init__(self, name, address, services):
@@ -274,21 +343,9 @@ async def scan_for_devices():
     try:
         print("Scanning for BLE devices...")
         devices = await BleakScanner.discover()
-        print(f"Found {len(devices)} devices.")
+        print(f"Scan complete. Found {len(devices)} devices.")
 
-        for device in devices:
-            if str(device.name) != "None":
-                services = device.metadata.get("uuids", [])
-                devices_found.append(
-                    Device(
-                        str(device.name + "\n" + device.address),
-                        str(device.address),
-                        services,
-                    )
-                )
-
-        print("Scan complete.")
-        return devices_found
+        return devices
 
     except Exception as e:
         print(f"Error during scan: {e}")
@@ -334,11 +391,25 @@ async def send_message_to_device(message):
         open_dlg_modal()
         page.update()
 
+async def connect_to_target():
+    devices = await scan_for_devices()
+    print("select device from list:")
+
+    index = 0
+    for device in devices:
+        index = index + 1
+        print(str(index) + ": " + str(device.name) + " " + str(device.address))
+
+    #input = await aioconsole.ainput()
+
+    #global client
+    #client = BleakClient(devices[input].address)
+
 epd = epd7in3f.EPD()
 
-pcp = serial.Serial('COM5', 115200, 8, "N", 1, timeout=10, rtscts=1)
+pcp = serial.Serial('COM11', 115200, 8, "N", 1, timeout=10, rtscts=1)
 
-test = 0
+test = 1
 if(test == 0):
     mystring = """AT+RUN "$autorun"\r\n"""
     pcp.write(mystring.encode())
@@ -347,11 +418,25 @@ if(test == 0):
 
 utc = pytz.UTC
 
-#UpdateEventList()
+#asyncio.run(connect_to_target())
+
+todays_events = []
+focus_event = []
+
+#first run
+UpdateEventList()
 UpdateDisplay()
 
-#schedule.every(15).minutes.do(UpdateEventList)
-schedule.every(5).minutes.do(UpdateDisplay)
+#schedule runs
+if test == 0:
+    schedule.every(15).minutes.do(UpdateEventList)
+    #schedule.every(5).minutes.do(UpdateDisplay)
+else:
+    schedule.every(30).seconds.do(UpdateEventList)
+    #schedule.every(1).minutes.do(UpdateDisplay)
+#schedule.every().day.at("07:30").do(UpdateDisplay)  #start of day
+#schedule.every().day.at("12:00").do(UpdateDisplay)  #lunch
+#schedule.every().day.at("17:00").do(UpdateDisplay)  #end of day
 
 while(True):
     schedule.run_pending()

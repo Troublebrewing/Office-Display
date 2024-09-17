@@ -17,6 +17,8 @@
 #define DISPLAY_BUSY_GPIO_NUMBER    11  //SIO_11
 #define DISPLAY_DO_GPIO_NUMBER      40  //SIO_40
 #define DISPLAY_CLK_GPIO_NUMBER     41  //SIO_41
+#define BATTERY_READ                30    //SIO30 
+#define BUTTON_GPIO                 31   //SIO31 
 
 #define DISPLAY_REFRESH_TIME        10000
 
@@ -26,6 +28,23 @@ DIM rl  //readlen
 DIM rd$ ,wr$,p$
 DIM wren
 DIM display_data$
+DIM battery_level
+
+//============================================================================== 
+ // Open VSP and start advertising 
+ //============================================================================== 
+ SUB OnStartup() 
+     DIM rc, hndl, tx$, scRpt$, addr$, adRpt$ : adRpt$="" : addr$="" 
+     rc=BleVSpOpen(128,128,0,hndl) 
+     rc=BleScanRptInit(scRpt$)  
+     rc=BleAdvRptAddUuid128(scRpt$,hndl) 
+     rc=BleAdvRptsCommit(adRpt$,scRpt$) 
+     rc=BleAdvertStart(0,addr$,20,300000,0) 
+     PRINT "\nAdvertising Device name: "; BleGetDeviceName$() 
+     
+     tx$="\nSend me some text \nTo exit the app, just tell me\n" 
+     rc = BleVSpWrite(tx$) 
+ ENDSUB 
 
 //*****************
 //Display Subroutines
@@ -53,26 +72,43 @@ SUB SendData()
     GpioWrite(DISPLAY_CS_GPIO_NUMBER,1)
 ENDSUB
 
+SUB StartDisplayTimeout()
+    
+    TimerCancel(1)              //restart timeout
+    TimerStart(1,2000,0)        //restart timeout
+
+ENDSUB
+
 SUB Wait_Until_Busy_High()
+    //print "wait for busy to go high..."
     //dim busy
     //DO
     //    busy = GpioRead(DISPLAY_BUSY_GPIO_NUMBER)
     //UNTIL(busy == 1)
+    //StartDisplayTimeout()
+
     Delay(1)
     while(!GpioRead(DISPLAY_BUSY_GPIO_NUMBER))
         Delay(1)
     endwhile
+    //TimerCancel(1)              //restart timeout
+    //print "done\n"
 ENDSUB
 
 SUB Wait_Until_Busy_Low()
+    //print "wait for busy to go low..."
     //dim busy
     //DO
     //    busy = GpioRead(DISPLAY_BUSY_GPIO_NUMBER)
     //UNTIL(busy == 0)
+    //StartDisplayTimeout()
+
     Delay(1)
     while(GpioRead(DISPLAY_BUSY_GPIO_NUMBER))
         Delay(1)
     endwhile
+    //TimerCancel(1)              //restart timeout
+    //print "done\n"
 ENDSUB
 
 SUB ResetPulse()
@@ -111,10 +147,15 @@ SUB HibernateDisplay()  //deep sleep/hibernate display
 ENDSUB
 
 SUB InitDisplay73()
+    print "Initializing display..."
+    //print "reset pulse..."
     ResetPulse()
+    //print "done\n"
+    //print "delay..."
     Delay(20)
+    //print "done\n"
     Wait_Until_Busy_High()
-
+    //print "sending init data..."
     wr$ = "\AA" : SendCommand()//CMDH
     wr$ = "\49\55\20\08\09\18" : SendData()
 
@@ -171,6 +212,7 @@ SUB InitDisplay73()
     
     wr$ = "\E6" : SendCommand()//TSSET
     wr$ = "\00" : SendData()
+    print "done"
 ENDSUB
 
 SUB WriteScreenBuffer()
@@ -252,6 +294,22 @@ FUNCTION UartRxTimeout()
     print "done\n"
 ENDFUNC 1
 
+//timer1
+FUNCTION DisplayTimeout()
+    print "display response timeout\n"
+ENDFUNC 1
+
+//timer2
+ FUNCTION ReadBattery() 
+    //Read the ADC 
+    battery_level = GpioRead(BATTERY_READ) 
+
+    //battery is scaled 0.682 by hardware
+    //10 bit adc, vref is VCC
+
+    PRINT "\nRaw Battery Level Reading: ";battery_level
+ ENDFUNC 1 
+
 //*****************
 //VSP Subroutines
 //*****************
@@ -260,9 +318,26 @@ ENDFUNC 1
 //Event and Error handlers
 //*****************
 
+
+
 //*****************
 //main program
 //*****************
+
+//*****************
+//setup
+//*****************
+//set regulator to 3.3V
+//dim regOutIndex
+//regOutIndex = GetRegout0()
+//IF regOutIndex != 5 THEN
+//    rc = SetREGOUT0(5)
+//ENDIF
+
+//*****************
+//display setup
+//*****************
+//set up display control pins
 rc= GpioSetFunc(DISPLAY_CS_GPIO_NUMBER,2,1)         //output
 rc= GpioSetFunc(DISPLAY_DC_GPIO_NUMBER,2,1)         //output
 rc= GpioSetFunc(DISPLAY_RESET_GPIO_NUMBER,2,1)      //output
@@ -270,18 +345,68 @@ rc= GpioSetFunc(DISPLAY_BUSY_GPIO_NUMBER,1,2)       //input, weak pull-up
 rc= GpioSetFunc(DISPLAY_DO_GPIO_NUMBER,2,1)         //output
 rc= GpioSetFunc(DISPLAY_CLK_GPIO_NUMBER,2,1)        //output
 
-#define BUTTON3_GPIO    24
-#define BUTTON4_GPIO    25
-rc = GpioSetFunc(BUTTON3_GPIO,1,4)
-rc = GpioSetFunc(BUTTON4_GPIO,1,4)
+//*****************
+//Status LED setup
+//*****************
+#define LED_R_GPIO    01    //SIO 01
+#define LED_G_GPIO    14    //SIO 14
+#define LED_B_GPIO    17    //SIO 17
 
-rc = GPIOBindEvent(0,BUTTON3_GPIO,1)
-rc = GPIOBindEvent(1,BUTTON4_GPIO,1)
+dim nFreq
+dim nResolution
+nFreq = 1024
+nResolution = 2048
+
+rc = GpioConfigPWM(nFreq, nResolution)  //set pwm frequency
+rc = GpioSetFunc(LED_R_GPIO,2,2)    //PWM output
+rc = GpioSetFunc(LED_G_GPIO,2,2)    //PWM output
+rc = GpioSetFunc(LED_B_GPIO,2,2)    //PWM output
+
+dim brightness
+brightness = 2048
+
+GpioWrite(LED_R_GPIO,brightness)
+//GpioWrite(LED_R_GPIO,0)
+brightness = 950
+GpioWrite(LED_G_GPIO,brightness)
+//GpioWrite(LED_G_GPIO,0)
+brightness = 2048
+GpioWrite(LED_B_GPIO,brightness)
+//GpioWrite(LED_B_GPIO,0)
 //print "press Button 0 to exit this application\n"
 
-ONEVENT EVUARTRX    CALL HndlrUartRx
+//*****************
+//battery input setup
+//*****************
+//Remove resistor 
+//rc = GpioSetFunc(BATTERY_READ, 1, 2) 
+ 
+//Analogue in 
+rc = GpioSetFunc(BATTERY_READ, 3, 0)
+
+ONEVENT EVTMR2      CALL ReadBattery
+
+//Start timer to read battery level
+TimerStart(2,60000,1) 
+
+//*****************
+//button setup
+//*****************
+//set button pin to input with pull-up
+rc = GpioSetFunc(BUTTON_GPIO,1,4)
+
+//attach button to interrupt handler
+rc = GPIOBindEvent(0,BUTTON_GPIO,1)
+
+//button event handler
 ONEVENT EVGPIOCHAN0 CALL Btn1Pressed
+
+
+
+//UART event handlers
+ONEVENT EVUARTRX    CALL HndlrUartRx
 ONEVENT EVTMR0      CALL UartRxTimeout
+//ONEVENT EVTMR1      CALL DisplayTimeout
 
 UartClose()
 
@@ -293,11 +418,13 @@ print "Opening SPI port..."
 rc=SpiOpen(0,2000000,0,h)
 print "done\n"
 
-print "Initializing display..."
 //InitDisplay565()
 InitDisplay73()
 Delay(100)
-print "done\n"
+//print "done\n"
+//ClearDisplay()
+
+OnStartup()
 
 WAITEVENT
 
