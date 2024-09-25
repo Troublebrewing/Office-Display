@@ -21,6 +21,11 @@ from gcsa.recurrence import Recurrence, DAILY, SU, SA
 
 import asyncio
 from bleak import BleakClient, BleakScanner
+# UUIDs for the virtual serial port
+SERVICE_UUID = "569a1101-b87f-490c-92cb-11ba5ea5167c"
+TX_FIFO_UUID = "569a2000-b87f-490c-92cb-11ba5ea5167c"  # Transmit characteristic
+RX_FIFO_UUID = "569a2001-b87f-490c-92cb-11ba5ea5167c"  # Receive characteristic
+
 import serial
 
 #cairo has some external dependencies
@@ -36,12 +41,16 @@ from reportlab.graphics import renderPM
 
 REFRESH_PERIOD_MINUTES = 5
 
+enable_serial = 1
+
 def make_image(focus_event):
     in_event = In_event(focus_event)
 
     if(in_event):
         if(focus_event.summary == "Focus time"):
             status = "Focus"
+        elif(focus_event.summary == "Out of office"):
+            status = "Out of Office"
         else:
             status = "Busy"
     else:
@@ -67,7 +76,7 @@ def make_image(focus_event):
     bordercolor = "white"
     if status == "Focus":
         bordercolor = EPD_YELLOW
-    if status == "Busy":
+    if (status == "Busy") or (status == "Out of Office"):
         bordercolor = EPD_RED
     if status == "Available":
         bordercolor = EPD_GREEN
@@ -227,7 +236,124 @@ def In_event(event):
         return in_event
     return in_event
 
-def UpdateDisplay():
+def run_length_encode(data):
+    """
+    Perform run-length encoding on a bytes or bytearray object.
+
+    Parameters:
+        data: A bytes or bytearray object to encode.
+
+    Returns:
+        A bytearray containing the run-length encoded data.
+    """
+    if not isinstance(data, (bytes, bytearray)):
+        raise TypeError("Input data must be of type bytes or bytearray")
+    
+    # Initialize an empty result list
+    encoded = bytearray()
+
+    # Handle the case of empty input
+    if len(data) == 0:
+        return encoded
+
+    # Start the run-length encoding process
+    count = 1
+    prev_byte = data[0]
+
+    for i in range(1, len(data)):
+        current_byte = data[i]
+        if current_byte == prev_byte:
+            count += 1
+            # Handle the case where count reaches the maximum value (255)
+            if count == 256:
+                encoded.append(prev_byte)
+                encoded.append(count-1)                
+                count = 1
+        else:
+            encoded.append(prev_byte)
+            encoded.append(count)
+            prev_byte = current_byte
+            count = 1
+
+    # Append the last run
+    encoded.append(prev_byte)
+    encoded.append(count)
+
+    return encoded
+
+def run_length_encode2(data):
+    """
+    Perform run-length encoding on a bytes or bytearray object.
+
+    Parameters:
+        data: A bytes or bytearray object to encode.
+
+    Returns:
+        A bytearray containing the run-length encoded data.
+    """
+    if not isinstance(data, (bytes, bytearray)):
+        raise TypeError("Input data must be of type bytes or bytearray")
+    
+    # Initialize an empty result list
+    encoded = bytearray()
+
+    # Handle the case of empty input
+    if len(data) == 0:
+        return encoded
+
+    # Start the run-length encoding process
+    encoded.append(data[0])
+    count = 1
+    i=1
+
+    for i in range(1, len(data)):
+        
+        if(encoded[-1] == data[i]):
+            #same byte, increment counter
+            count += 1
+            if(count == 256):
+                #write count then the same character again
+                encoded.append(count-1)
+                count = 1
+                encoded.append(encoded[-2])
+        else:
+            encoded.append(count)
+            count = 1
+            encoded.append(data[i])
+    
+    encoded.append(count)
+
+    return encoded
+
+def run_length_decode(data):
+    # Initialize an empty result list
+    decoded = bytearray()
+
+    # Iterate over the encoded data two bytes at a time (count, value)
+    i = 0
+    while i < len(data):
+        count = data[i + 1]     # First byte is the count
+        value = data[i] # Second byte is the value
+        decoded.extend([value] * count)  # Replicate 'value' by 'count' times
+        i += 2
+
+    return decoded
+
+def bytearray_compare(ba1, ba2):
+    length1 = len(ba1)
+    length2 = len(ba2)
+
+    i = 0
+    while(ba1[i] == ba2[i]):
+        i = i+1
+        if i==length1 or i==length2:
+            break
+
+    print(f"Mismatch found at index: {i}\n")
+    print(f"bytearray1: {ba1[i-10:i+10]}")
+    print(f"bytearray2: {ba2[i-10:i+10]}")
+
+async def UpdateDisplay():
     #UpdateEventList()
     
     timestring = datetime.datetime.now().strftime("%I:%M %p")
@@ -266,13 +392,46 @@ def UpdateDisplay():
 
         #encode into datastream for waveshare display
         wavesharebuf = epd.getbuffer(im)
+        #image_bytes = bytes(wavesharebuf)
+        image_bytearray = bytearray(wavesharebuf)
+        
+        RLE_image_bytearray = run_length_encode(image_bytearray)
+        #RLE_image_bytearray = run_length_encode2(image_bytearray)
+        
+        #bytearray_compare(RLE_image_bytearray, RLE_image_bytearray2)
+        #decoded = run_length_decode(RLE_image_bytearray)
+        #decoded2 = run_length_decode(RLE_image_bytearray2)
+        #print(f'{decoded}')
+        #print(f'{decoded2}')
 
-        #if(test == 0):
-        print("Sending image through serial port...", end='')
-        pcp.write(wavesharebuf)
-        print("done")
+        #bytearray_compare(image_bytearray, decoded)
+        #bytearray_compare(image_bytearray, decoded2)
 
-            #send_message_to_device(wavesharebuf)
+        #print(f"wavesharebuf size: {len(wavesharebuf)} RLE size: {len(RLE_wavesharebuf)}")
+        #print(f"image_bytes size: {len(image_bytes)} RLE size: {len(RLE_image_bytes)}")
+        print(f"image_bytearray size: {len(image_bytearray)} RLE size: {len(RLE_image_bytearray)}")
+
+        #if(pcp):
+            #if(test == 0):
+            #print("Sending image through serial port...", end='')
+            #pcp.write(wavesharebuf)
+            #print("done")
+
+        #device_connected=1
+        #if(device_connected):
+
+        #test = bytearray([255] * 510)
+        #print(f"test length: {len(test)}\n")
+        #print(f"test data: {test}\n")
+        
+        #encode_test = run_length_encode2(test)
+        #print(f"encoded test length:{len(encode_test)}\n")
+        #print(f"encoded test data: {encode_test}\n")
+
+        #decode_test = run_length_decode(encode_test)
+        #print(f"decoded test length:{len(decode_test)}\n")
+        #print(f"decoded test: {decode_test}\n")
+        await send_bytes_to_client(RLE_image_bytearray)
     else:
         print(f"Focus event is still {focus_event.summary}. skipping...")
 
@@ -282,34 +441,31 @@ def UpdateDisplay():
     return schedule.CancelJob
     
 def ScheduleNextUpdate(focus_event):
-    
-
     in_event = In_event(focus_event)
 
     # available
     if(focus_event is not None):
         if(in_event):
-            time_free_avail = focus_event.end.strftime("%I:%M %p")
+            #next_time = focus_event.end.strftime("%I:%M %p")
+            next_time = focus_event.end
         else:
-            time_free_avail = focus_event.start.strftime("%I:%M %p")
-    
+            #next_time = focus_event.start.strftime("%I:%M %p")
+            next_time = focus_event.start
     else:
+        # Get the current time
+        now = datetime.datetime.now()
 
-
-    now_str = now.strftime('%H:%M')
+        now_str = now.strftime('%H:%M')
     
-    #print(f"runing run_once at: {now_str}")
+        #print(f"runing run_once at: {now_str}")
 
-    # Get the current time
-    now = datetime.datetime.now()
-
-    # Add the random number of minutes to the current time
-    next_time = now + datetime.timedelta(minutes=5)
+        # Add the random number of minutes to the current time
+        next_time = now + datetime.timedelta(minutes=5)
 
     # Print the time in HH:MM format
     next_time_str = next_time.strftime('%H:%M')
 
-    print(f"next run at: {next_time_str}")
+    print(f"next display update at: {next_time_str}")
 
     schedule.every().day.at(next_time_str).do(UpdateDisplay)
 
@@ -342,102 +498,178 @@ async def scan_for_devices():
     devices_found = []
     try:
         print("Scanning for BLE devices...")
-        devices = await BleakScanner.discover()
+        devices = await BleakScanner.discover(timeout=5.0)
         print(f"Scan complete. Found {len(devices)} devices.")
 
-        return devices
+        named_devices = [device for device in devices if device.name]
+        
+        if not named_devices:
+            print("No devices with names found.")
+            return None
+        
+        print("Available devices:")
+        for i, device in enumerate(named_devices):
+            print(f"{i + 1}. {device.name} - {device.address}")
+
+        return named_devices
 
     except Exception as e:
         print(f"Error during scan: {e}")
         return []
 
 # Define an async function to send a message to the device
-async def send_message_to_device(message):
+async def send_bytes_to_client(databytes):
     try:
-        # Check message length
-        if len(message) <= 20:
-            # Pad spaces if message is shorter than 20 bytes
-            message = message.ljust(20)
-            # Check if the BleakClient object is available globally
-            if "client" in globals():
-                # Check if the client is connected
-                if client.is_connected:
-                    # Encode the message string to bytes before sending
-                    message_bytes = message.encode()
-                    # Send the message to the RXUUID of the Bluetooth device
-                    await client.write_gatt_char(
-                        RX_UUID, message_bytes, response=True
-                    )
-                    return  # Exit function after successful transmission
-                else:
-                    print("Device is not connected.")
-                    open_dlg_modal()
-                    page.update()
+        # Check if the BleakClient object is available globally
+        if "client" in globals():
+            await client.connect()
+            # Check if the client is connected
+            if client.is_connected:
+                print("Sending data to BLE Client")
+                for i in range(0, len(databytes), 20):
+                    chunk = databytes[i:i+20]
+                    #chunk = bytearray([1,2,3,4,5,6,7,8,0,9,1,2,3,4,5,6,7,8,0,9])
+                    try:
+                        # Send the message to the RXUUID of the Bluetooth device
+                        #await client.write_gatt_char(RX_FIFO_UUID, image_data, response=True)
+                        await client.write_gatt_char(RX_FIFO_UUID, chunk)
+                        print(f"{i}/{len(databytes)}\n")
+                    except Exception as e:
+                        print(f"Error sending chunk: {e}")
+
+                print("done\n")
+                await client.disconnect()
+                return  # Exit function after successful transmission
 
             else:
-                print("BleakClient object not available.")
-        else:
-            # Print error message to chat log under system user
-            error_message = Message(
-                "System",
-                "Error: Message cannot exceed 20 bytes",
-                message_type="system_message",
-            )
-            chat.controls.append(ChatMessage(error_message))
-            page.update()
-            print("Error: Message cannot exceed 20 bytes.")
+                print("Device is not connected.")
+                #await connect_to_device()
+
     except Exception as e:
         print(f"Error sending message to device: {e}")
-        open_dlg_modal()
-        page.update()
 
-async def connect_to_target():
-    devices = await scan_for_devices()
-    print("select device from list:")
+async def connect_to_device(address=None):
+    #if address:
+        # Try to connect directly to the provided address
+        #print(f"Attempting to connect to device at address {address}...")
+        #try:
+            #async with BleakClient(address) as client:
+                #if client.is_connected:
+                #    print(f"Successfully connected to device at {address}")
+                #else:
+                #    print(f"Failed to connect to device at {address}")
+        #except Exception as e:
+            #print(f"Error connecting to {address}: {e}")
+    
+    if address==None:
+        # No address provided, scan for devices
+        named_devices = await scan_for_devices()
 
-    index = 0
-    for device in devices:
-        index = index + 1
-        print(str(index) + ": " + str(device.name) + " " + str(device.address))
+        if not named_devices:
+            return
+    
+        #prompt user for selection
+        while True:
+            try:
+                selection = int(input("Enter the number of the device you wish to connect to: ")) - 1
+                if 0 <= selection < len(named_devices):
+                    selected_device = named_devices[selection]
+                    address = selected_device.address
+                    break                    
+                else:
+                    print("Invalid selection. Please choose a valid number.")
+            except ValueError:
+                print("Invalid input. Please enter a number.")
+    
+    print(f"Attempting to connect to device at address {address}...")
 
-    #input = await aioconsole.ainput()
+    global client
 
-    #global client
-    #client = BleakClient(devices[input].address)
+    async with BleakClient(address) as client:
+        if client.is_connected:
+            print(f"Successfully connected to device at {address}")
+
+            #global client
+            #client = client_obj  # Save the BleakClient object globally
+
+            # Write dummy bytes to the TX FIFO characteristic
+            #dummy_data = bytearray([0x01, 0x02, 0x03, 0x04])  # Replace with actual data if needed
+            #print(f"Sending dummy data: {dummy_data}")
+            
+            #try:
+                #await client.write_gatt_char(TX_FIFO_UUID, dummy_data)
+                #await client.write_gatt_char(RX_FIFO_UUID, dummy_data)
+                #print(f"Data sent to TX FIFO characteristic ({RX_FIFO_UUID}).")
+                
+                #read_str = pcp.read(10)
+                #print(f"serial data:{read_str}")
+                # Optionally read from the RX FIFO after sending data
+                #rx_data = await client.read_gatt_char(TX_FIFO_UUID)
+                #print(f"Received data from RX FIFO characteristic: {rx_data}")
+            #except Exception as e:
+                #print(f"Failed to send or receive data: {e}")
+
+        else:
+            print(f"Failed to connect to device at {address}")
+
 
 epd = epd7in3f.EPD()
 
-pcp = serial.Serial('COM11', 115200, 8, "N", 1, timeout=10, rtscts=1)
 
-test = 1
-if(test == 0):
-    mystring = """AT+RUN "$autorun"\r\n"""
-    pcp.write(mystring.encode())
-    time.sleep(1)
 
 
 utc = pytz.UTC
+#pcp = serial.Serial('COM11', 115200, 8, "N", 1, timeout=10, rtscts=1)
 
+#asyncio.run(connect_to_device(address="FF:B2:EA:E5:D6:24"))
+#asyncio.run(connect_to_device(address="FF:B2:EA:E5:D6:24"))
 #asyncio.run(connect_to_target())
 
-todays_events = []
-focus_event = []
+async def main():
+    #epd = epd7in3f.EPD()
+    #utc = pytz.UTC
+
+    #if(enable_serial == 1):      
+    #    mystring = """AT+RUN "$autorun"\r\n"""
+    #    pcp.write(mystring.encode())
+    #    time.sleep(1)
+
+    await connect_to_device(address="FF:B2:EA:E5:D6:24")
+
+    global todays_events
+    global focus_event
+
+    todays_events = []
+    focus_event = []
+
+    UpdateEventList()
+
+    await UpdateDisplay()
+
+    schedule.every(15).minutes.do(UpdateEventList)
+
+    while(True):
+        schedule.run_pending()
+        time.sleep(1)
+
+asyncio.run(main())
+
+#todays_events = []
+#focus_event = []
 
 #first run
-UpdateEventList()
-UpdateDisplay()
+#UpdateEventList()
+#UpdateDisplay()
 
 #schedule runs
-if test == 0:
-    schedule.every(15).minutes.do(UpdateEventList)
-    #schedule.every(5).minutes.do(UpdateDisplay)
-else:
-    schedule.every(30).seconds.do(UpdateEventList)
-    #schedule.every(1).minutes.do(UpdateDisplay)
+#schedule.every(15).minutes.do(UpdateEventList)
+#schedule.every(5).minutes.do(UpdateDisplay)
+
+#schedule.every(30).seconds.do(UpdateEventList)
+#schedule.every(1).minutes.do(UpdateDisplay)
 #schedule.every().day.at("07:30").do(UpdateDisplay)  #start of day
 #schedule.every().day.at("12:00").do(UpdateDisplay)  #lunch
 #schedule.every().day.at("17:00").do(UpdateDisplay)  #end of day
 
-while(True):
-    schedule.run_pending()
-    time.sleep(1)
+
+

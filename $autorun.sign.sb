@@ -22,6 +22,9 @@
 
 #define DISPLAY_REFRESH_TIME        10000
 
+#define CONFIG_KEY_ID_START_STR   100                             //The start ID in nvrecord non-vol space for string config keys
+#define CONFIG_KEY_ID_MAX_STR     10                              //Maximum number of string config keys
+
 DIM rc
 DIM h   //handle
 DIM rl  //readlen
@@ -35,12 +38,16 @@ DIM battery_level
  //============================================================================== 
  SUB OnStartup() 
      DIM rc, hndl, tx$, scRpt$, addr$, adRpt$ : adRpt$="" : addr$="" 
+     
      rc=BleVSpOpen(128,128,0,hndl) 
-     rc=BleScanRptInit(scRpt$)  
+     scRpt$=""
+     rc=BleScanRptInit(scRpt$) 
+
      rc=BleAdvRptAddUuid128(scRpt$,hndl) 
      rc=BleAdvRptsCommit(adRpt$,scRpt$) 
+     addr$ = ""
      rc=BleAdvertStart(0,addr$,20,300000,0) 
-     PRINT "\nAdvertising Device name: "; BleGetDeviceName$() 
+     PRINT "\nAdvertising Device name: "; BleGetDeviceName$();"\n"
      
      tx$="\nSend me some text \nTo exit the app, just tell me\n" 
      rc = BleVSpWrite(tx$) 
@@ -300,7 +307,7 @@ FUNCTION DisplayTimeout()
 ENDFUNC 1
 
 //timer2
- FUNCTION ReadBattery() 
+FUNCTION ReadBattery() 
     //Read the ADC 
     battery_level = GpioRead(BATTERY_READ) 
 
@@ -308,12 +315,95 @@ ENDFUNC 1
     //10 bit adc, vref is VCC
 
     PRINT "\nRaw Battery Level Reading: ";battery_level
- ENDFUNC 1 
+ENDFUNC 1 
 
 //*****************
 //VSP Subroutines
 //*****************
+FUNCTION decode_and_spi_write(encodedString$)
+    dim num_encoded_bytes, i, count, x as integer
+    dim decoded_data$, byte$
+    num_encoded_bytes = STRLEN(encodedString$)
 
+    decoded_data$= ""
+    //print "encoded data length: ";num_encoded_bytes;"\n"
+    //print "encoded data: ";encodedString$;"\n"
+    
+    FOR i=0 TO num_encoded_bytes STEP 2
+        //get left most character
+        byte$ = MID$(encodedString$,i,1)
+        rc = StrDecodeU8(encodedString$,count,i+1)
+
+        //send that number of bytes to display
+        FOR x=1 TO count
+            //decoded_data$ = decoded_data$ + byte$
+            rc = SpiWrite(byte$)
+        NEXT
+    NEXT
+    //print "decoded_data: ";decoded_data$;"\n"    
+        
+ENDFUNC 1
+
+FUNCTION HndlrVSPRx() AS INTEGER 
+    //if timer not running
+    if TimerRunning(0) == 0 THEN
+        wr$ = "\10" : SendCommand()     //start data
+        GpioWrite(DISPLAY_DC_GPIO_NUMBER,1)
+        GpioWrite(DISPLAY_CS_GPIO_NUMBER,0)
+    ENDIF
+
+    
+    DIM rc, rx$, e$ : e$="exit"  
+    rc=BleVSpRead(rx$,20) 
+    PRINT "\nEncoded data: ";rx$;"\n"  
+
+    //DIM tx$
+    //tx$="received"
+    //rc = BleVSpWrite(tx$)
+
+    //If user has typed exit 
+    //IF StrPos(rx$,e$,0) > -1 THEN 
+    //    EXITFUNC 0 
+    //ENDIF 
+
+    TimerCancel(0)              //restart timeout
+
+    rc = decode_and_spi_write(rx$)
+
+    TimerStart(0,2000,0)        //restart timeout
+
+    //rc=SpiWrite(display_data$)  //send data to display
+
+    //strLength = UartWrite(display_data$)    //loopback
+    //display_data$ = ""          //clear buffer
+ENDFUNC 1
+
+FUNCTION HndlrBleMsg(BYVAL nMsgId AS INTEGER, BYVAL nCtx AS INTEGER)  
+    SELECT nMsgId 
+        CASE 0 
+            PRINT "BLE Connection ";nCtx;" established\n"
+        CASE 1 
+            PRINT "BLE Connection ";nCtx;" disconnected\n" 
+            //PRINT "BLE Disconnected \n" 
+        case 10
+            PRINT "New Bonding created\n"
+        CASE 18 
+            PRINT "Connection ";nCtx;" is now encrypted\n" 
+        CASE 16 
+            PRINT "Connected to a bonded master\n" 
+        CASE 17 
+            PRINT "A new pairing has replaced the old key\n";    
+        CASE ELSE 
+            PRINT "Unknown Ble Msg\n" 
+    ENDSELECT 
+ENDFUNC 1
+
+FUNCTION HndlrDiscon(hConn, nRsn)
+    print "BLE disconnected, starting advertisement...\n"
+    dim addr$ 
+    addr$=""
+    rc=BleAdvertStart(0,addr$,20,300000,0)
+ENDFUNC 1
 //*****************
 //Event and Error handlers
 //*****************
@@ -333,6 +423,32 @@ ENDFUNC 1
 //IF regOutIndex != 5 THEN
 //    rc = SetREGOUT0(5)
 //ENDIF
+
+//------------------------------------------------------------------------------
+// There are 2 types of non-volatile config keys. One type stores integer values
+// and the other stores string values.
+// This function sets the INTEGER variety and validates against min/max
+// Valid keyID values are 0 to (CONFIG_KEY_ID_MAX_STR-1)
+// returns 0 if successful, 1 invalid key, 2 invalid value, 3 if NvRecordSet fails
+//------------------------------------------------------------------------------
+function ConfigKeySet$(keyID as integer, newVal$ as string) as integer
+    //if (keyID<0)||(keyID>=CONFIG_KEY_ID_MAX_STR) then
+    //    exitfunc 1
+    //endif
+
+    //if ConfigKey$IsValid(keyID,newVal$)==0 then
+        //new value is not valid
+    //    exitfunc 2
+    //endif
+
+    rc = NvRecordSet((keyID + CONFIG_KEY_ID_START_STR),newVal$)
+
+    //if (rc <= 0 && (NvReadFailMode & 1) == 1) then
+    //    //Failed to write non-volatile record and application set to not continue
+    //    NvFailure()
+    //    exitfunc 3
+    //endif
+endfunc 0
 
 //*****************
 //display setup
@@ -384,10 +500,10 @@ GpioWrite(LED_B_GPIO,brightness)
 //Analogue in 
 rc = GpioSetFunc(BATTERY_READ, 3, 0)
 
-ONEVENT EVTMR2      CALL ReadBattery
+//ONEVENT EVTMR2      CALL ReadBattery
 
 //Start timer to read battery level
-TimerStart(2,60000,1) 
+//TimerStart(2,60000,1) 
 
 //*****************
 //button setup
@@ -407,6 +523,9 @@ ONEVENT EVGPIOCHAN0 CALL Btn1Pressed
 ONEVENT EVUARTRX    CALL HndlrUartRx
 ONEVENT EVTMR0      CALL UartRxTimeout
 //ONEVENT EVTMR1      CALL DisplayTimeout
+ONEVENT EVVSPRX     CALL HndlrVSPRx
+ONEVENT EVDISCON    CALL HndlrDiscon
+ONEVENT EVBLEMSG    CALL HndlrBleMsg
 
 UartClose()
 
@@ -423,6 +542,15 @@ InitDisplay73()
 Delay(100)
 //print "done\n"
 //ClearDisplay()
+
+//dim name$
+//name$ = "Office Display"
+//rc = ConfigKeySet$(17,name$)
+
+//dim test_data$
+//test_data$ = "\01\02\03\04\05\06\07\08\09\0A\0B\0C\0D\0E"
+//print "encoded data:";test_data$;
+//rc = decode_and_spi_write(test_data$)
 
 OnStartup()
 
