@@ -84,7 +84,7 @@ def make_image(focus_event):
     #outline
     borderwidth = 20
     padding = 10
-    im2.rectangle([(0,0),(display_width,display_height)], fill=None, outline=bordercolor, width=borderwidth)
+    im2.rectangle([(0,0),(display_width-1,display_height-1)], fill=None, outline=bordercolor, width=borderwidth)
 
     # time
     timefont = ImageFont.truetype('Inter/static/Inter-Bold.ttf', 35)
@@ -388,16 +388,17 @@ async def UpdateDisplay():
         im = make_image(focus_event)
 
         #show image
-        #im.show()
+        im.show()
 
         #encode into datastream for waveshare display
         wavesharebuf = epd.getbuffer(im)
         #image_bytes = bytes(wavesharebuf)
         image_bytearray = bytearray(wavesharebuf)
+        print(f"image bytes: {image_bytearray}\n")
         
         RLE_image_bytearray = run_length_encode(image_bytearray)
         #RLE_image_bytearray = run_length_encode2(image_bytearray)
-        
+        print(f"encoded image: {RLE_image_bytearray}\n")
         #bytearray_compare(RLE_image_bytearray, RLE_image_bytearray2)
         #decoded = run_length_decode(RLE_image_bytearray)
         #decoded2 = run_length_decode(RLE_image_bytearray2)
