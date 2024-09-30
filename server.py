@@ -396,7 +396,7 @@ async def UpdateDisplay():
         image_bytearray = bytearray(wavesharebuf)
         print(f"image bytes: {image_bytearray}\n")
         
-        RLE_image_bytearray = run_length_encode(image_bytearray)
+        RLE_image_bytearray = run_length_encode2(image_bytearray)
         #RLE_image_bytearray = run_length_encode2(image_bytearray)
         print(f"encoded image: {RLE_image_bytearray}\n")
         #bytearray_compare(RLE_image_bytearray, RLE_image_bytearray2)
@@ -518,27 +518,92 @@ async def scan_for_devices():
         print(f"Error during scan: {e}")
         return []
 
+response_received = False
+
+# Callback to handle received notifications
+def notification_handler(sender, data):
+    """
+    Callback function that is called when data is received from the Bluetooth device.
+    
+    Parameters:
+        sender: The sender of the notification (characteristic UUID).
+        data: The data received in bytes.
+    """
+    
+    global response_received
+    # Assuming the response contains the string "received" as an acknowledgment
+    if b"received" in data:
+        #print(f"Received acknowledgment from device: {data}")
+        response_received = True
+    else:
+        print(f"Unexpected response from {sender}: {data}")
+
+async def wait_for_response():
+    """
+    A helper function that waits for the response_received flag to be set to True.
+    """
+    global response_received
+    while not response_received:
+        await asyncio.sleep(0.01)  # Small sleep to avoid busy-waiting
+
 # Define an async function to send a message to the device
 async def send_bytes_to_client(databytes):
+    global response_received
+
+    max_retries = 5
+    timeout_ms = 1000
+
     try:
+        image_size = len(run_length_decode(databytes))
         # Check if the BleakClient object is available globally
         if "client" in globals():
             await client.connect()
+
+            
             # Check if the client is connected
             if client.is_connected:
+                await client.start_notify(TX_FIFO_UUID, notification_handler)
+
                 print("Sending data to BLE Client")
+                image_bytes_sent = 0
                 for i in range(0, len(databytes), 20):
                     chunk = databytes[i:i+20]
-                    #chunk = bytearray([1,2,3,4,5,6,7,8,0,9,1,2,3,4,5,6,7,8,0,9])
-                    try:
-                        # Send the message to the RXUUID of the Bluetooth device
-                        #await client.write_gatt_char(RX_FIFO_UUID, image_data, response=True)
-                        await client.write_gatt_char(RX_FIFO_UUID, chunk)
-                        print(f"{i}/{len(databytes)}\n")
-                    except Exception as e:
-                        print(f"Error sending chunk: {e}")
+                    decoded_chunk = run_length_decode(chunk)
+                    image_bytes_sent = image_bytes_sent + len(decoded_chunk)
+                    retries = 0 #initialize retries for each chunk
 
-                print("done\n")
+                    while retries < max_retries:
+                        try:
+                            # Wait for the acknowledgment before proceeding
+                            response_received = False  # Reset flag before waiting
+                                                        
+                            # Send the message to the RXUUID of the Bluetooth device
+                            #await client.write_gatt_char(RX_FIFO_UUID, image_data, response=True)
+                            await client.write_gatt_char(RX_FIFO_UUID, chunk)
+                            print(f"Transmitted: {i+20}/{len(databytes)} bytes. Expanded: {image_bytes_sent}/{image_size}\n")
+                            
+                            try:
+                                await asyncio.wait_for(wait_for_response(), timeout_ms / 1000)
+                                if response_received:
+                                    #print("Response received, proceeding to the next chunk.")
+                                    break
+                            except asyncio.TimeoutError:
+                                print(f"No response received within {timeout_ms}ms, retrying... (Attempt {retries+1}/{max_retries})")
+                                retries += 1  # Increment retries if timeout occurs
+                            
+                        except Exception as e:
+                            print(f"Error sending chunk: {e}")
+                            retries += 1  # Increment retries on exception
+                    
+                    if retries == max_retries:
+                        print(f"Max retries reached for chunk {i}. Aborting.")
+                        break
+
+                print("Data transmission complete\n")
+
+                # Stop notifications when done
+                await client.stop_notify(RX_FIFO_UUID)
+
                 await client.disconnect()
                 return  # Exit function after successful transmission
 
@@ -648,6 +713,7 @@ async def main():
     await UpdateDisplay()
 
     schedule.every(15).minutes.do(UpdateEventList)
+    schedule.every(2).minutes.do(UpdateDisplay)
 
     while(True):
         schedule.run_pending()

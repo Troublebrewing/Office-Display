@@ -32,25 +32,26 @@ DIM rd$ ,wr$,p$
 DIM wren
 DIM display_data$
 DIM battery_level
+DIM total_bytes
 
 //============================================================================== 
  // Open VSP and start advertising 
  //============================================================================== 
  SUB OnStartup() 
-     DIM rc, hndl, tx$, scRpt$, addr$, adRpt$ : adRpt$="" : addr$="" 
+    DIM rc, hndl, tx$, scRpt$, addr$, adRpt$ : adRpt$="" : addr$="" 
      
-     rc=BleVSpOpen(128,128,0,hndl) 
-     scRpt$=""
-     rc=BleScanRptInit(scRpt$) 
+    rc=BleVSpOpen(128,128,0,hndl) 
+    scRpt$=""
+    rc=BleScanRptInit(scRpt$) 
 
-     rc=BleAdvRptAddUuid128(scRpt$,hndl) 
-     rc=BleAdvRptsCommit(adRpt$,scRpt$) 
-     addr$ = ""
-     rc=BleAdvertStart(0,addr$,20,300000,0) 
-     PRINT "\nAdvertising Device name: "; BleGetDeviceName$();"\n"
+    rc=BleAdvRptAddUuid128(scRpt$,hndl) 
+    rc=BleAdvRptsCommit(adRpt$,scRpt$) 
+    addr$ = ""
+    rc=BleAdvertStart(0,addr$,20,0,0) 
+    PRINT "\nAdvertising Device name: "; BleGetDeviceName$();"\n"
      
-     tx$="\nSend me some text \nTo exit the app, just tell me\n" 
-     rc = BleVSpWrite(tx$) 
+    //tx$="\nSend me some text \nTo exit the app, just tell me\n" 
+    //rc = BleVSpWrite(tx$) 
  ENDSUB 
 
 //*****************
@@ -219,7 +220,7 @@ SUB InitDisplay73()
     
     wr$ = "\E6" : SendCommand()//TSSET
     wr$ = "\00" : SendData()
-    print "done"
+    print "done\n"
 ENDSUB
 
 SUB WriteScreenBuffer()
@@ -229,7 +230,7 @@ SUB WriteScreenBuffer()
     rd$="" 
     DIM i AS INTEGER
     FOR i=0 TO ((EPD_WIDTH*EPD_HEIGHT)/2)
-        wr$ = "\44"
+        wr$ = "\11"
         rc=SpiWrite(wr$)
     NEXT    
     GpioWrite(DISPLAY_CS_GPIO_NUMBER,1)
@@ -286,7 +287,8 @@ ENDFUNC 0
 FUNCTION UartRxTimeout()
     GpioWrite(DISPLAY_CS_GPIO_NUMBER,1) //release chip select
 
-    print "Data Reception done. Updating display now...\n"
+    print "Data Reception done. Total bytes written:";total_bytes;"\n"
+    print "Updating display now...\n"
 
     print "Powering on display..."
     PowerOnDisplay()
@@ -338,9 +340,10 @@ FUNCTION decode_and_spi_write(encodedString$)
         FOR x=1 TO count
             //print byte$
             rc = SpiWrite(byte$)
+            total_bytes = total_bytes+1
         NEXT
     NEXT
-    //print "decoded_data: ";decoded_data$;"\n"    
+    //print "written bytes: ";total_bytes;"\n"    
         
 ENDFUNC 1
 
@@ -351,17 +354,17 @@ FUNCTION HndlrVSPRx() AS INTEGER
         wr$ = "\10" : SendCommand()     //start data
         GpioWrite(DISPLAY_DC_GPIO_NUMBER,1)
         GpioWrite(DISPLAY_CS_GPIO_NUMBER,0)
+        total_bytes=0
     ENDIF
 
     
+
     DIM rc, rx$, e$ : e$="exit"  
     rx$ = ""
     rc=BleVSpRead(rx$,20) 
     //PRINT "\nEncoded data: ";rx$;"\n"  
 
-    //DIM tx$
-    //tx$="received"
-    //rc = BleVSpWrite(tx$)
+    
 
     //If user has typed exit 
     //IF StrPos(rx$,e$,0) > -1 THEN 
@@ -372,7 +375,13 @@ FUNCTION HndlrVSPRx() AS INTEGER
 
     rc = decode_and_spi_write(rx$)
 
-    TimerStart(0,2000,0)        //restart timeout
+    DIM tx$
+    tx$="rx:";total_bytes;"bytes"
+    rc = BleVSpWrite(tx$)
+    //tx$="\nSend me some text \nTo exit the app, just tell me\n" 
+    //rc = BleVSpWrite(tx$) 
+
+    TimerStart(0,5000,0)        //restart timeout
 
     rx$ = ""
 
@@ -406,7 +415,11 @@ FUNCTION HndlrDiscon(hConn, nRsn)
     print "BLE disconnected, starting advertisement...\n"
     dim addr$ 
     addr$=""
-    rc=BleAdvertStart(0,addr$,20,300000,0)
+    rc=BleAdvertStart(0,addr$,20,0,0)
+ENDFUNC 1
+
+FUNCTION HandlerVSpTxEmpty() AS INTEGER
+    print "TX BUFFER EMPTY\n"
 ENDFUNC 1
 //*****************
 //Event and Error handlers
@@ -530,6 +543,7 @@ ONEVENT EVTMR0      CALL UartRxTimeout
 ONEVENT EVVSPRX     CALL HndlrVSPRx
 ONEVENT EVDISCON    CALL HndlrDiscon
 ONEVENT EVBLEMSG    CALL HndlrBleMsg
+//ONEVENT EVVSPTXEMPTY  CALL HandlerVSpTxEmpty
 
 UartClose()
 
