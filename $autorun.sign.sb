@@ -32,7 +32,8 @@ DIM rd$ ,wr$,p$
 DIM wren
 DIM display_data$
 DIM battery_level
-DIM total_bytes
+DIM total_bytes_written
+DIM total_bytes_received
 
 //============================================================================== 
  // Open VSP and start advertising 
@@ -287,7 +288,9 @@ ENDFUNC 0
 FUNCTION UartRxTimeout()
     GpioWrite(DISPLAY_CS_GPIO_NUMBER,1) //release chip select
 
-    print "Data Reception done. Total bytes written:";total_bytes;"\n"
+    print "Data Reception done.\n" 
+    print "Total bytes received:";total_bytes_received;"\n"
+    print "Total bytes written:";total_bytes_written;"\n"
     print "Updating display now...\n"
 
     print "Powering on display..."
@@ -326,7 +329,7 @@ FUNCTION decode_and_spi_write(encodedString$)
     dim num_encoded_bytes, i, count, x as integer
     dim decoded_data$, byte$
     num_encoded_bytes = STRLEN(encodedString$)
-
+    total_bytes_received = total_bytes_received + num_encoded_bytes
     //decoded_data$= ""
     //print "encoded data length: ";num_encoded_bytes;"\n"
     //print "encoded data: ";encodedString$;"\n"
@@ -340,7 +343,7 @@ FUNCTION decode_and_spi_write(encodedString$)
         FOR x=1 TO count
             //print byte$
             rc = SpiWrite(byte$)
-            total_bytes = total_bytes+1
+            total_bytes_written = total_bytes_written+1
         NEXT
     NEXT
     //print "written bytes: ";total_bytes;"\n"    
@@ -354,7 +357,8 @@ FUNCTION HndlrVSPRx() AS INTEGER
         wr$ = "\10" : SendCommand()     //start data
         GpioWrite(DISPLAY_DC_GPIO_NUMBER,1)
         GpioWrite(DISPLAY_CS_GPIO_NUMBER,0)
-        total_bytes=0
+        total_bytes_written=0
+        total_bytes_received=0
     ENDIF
 
     
@@ -376,7 +380,9 @@ FUNCTION HndlrVSPRx() AS INTEGER
     rc = decode_and_spi_write(rx$)
 
     DIM tx$
-    tx$="rx:";total_bytes;"bytes"
+    tx$ = "received"
+    //SPRINT #tx$, "rx:";integer.h' total_bytes_written
+    SPRINT #tx$, "rx:";integer.h' total_bytes_received
     rc = BleVSpWrite(tx$)
     //tx$="\nSend me some text \nTo exit the app, just tell me\n" 
     //rc = BleVSpWrite(tx$) 

@@ -388,17 +388,17 @@ async def UpdateDisplay():
         im = make_image(focus_event)
 
         #show image
-        im.show()
+        #im.show()
 
         #encode into datastream for waveshare display
         wavesharebuf = epd.getbuffer(im)
         #image_bytes = bytes(wavesharebuf)
         image_bytearray = bytearray(wavesharebuf)
-        print(f"image bytes: {image_bytearray}\n")
+        #print(f"image bytes: {image_bytearray}\n")
         
         RLE_image_bytearray = run_length_encode2(image_bytearray)
         #RLE_image_bytearray = run_length_encode2(image_bytearray)
-        print(f"encoded image: {RLE_image_bytearray}\n")
+        #print(f"encoded image: {RLE_image_bytearray}\n")
         #bytearray_compare(RLE_image_bytearray, RLE_image_bytearray2)
         #decoded = run_length_decode(RLE_image_bytearray)
         #decoded2 = run_length_decode(RLE_image_bytearray2)
@@ -531,10 +531,22 @@ def notification_handler(sender, data):
     """
     
     global response_received
-    # Assuming the response contains the string "received" as an acknowledgment
-    if b"received" in data:
-        #print(f"Received acknowledgment from device: {data}")
+    global bytes_received
+    #print(f"rx data:{data}\n")
+    #print(f"just number portion as bytes:{data[3:]}")
+    #result = data[3:].decode(ascii)
+    #result = data[3:].decode(ascii)
+    #print(f"string:{result}")
+    #number = int(result, 16)
+    #print(f"number:{number}")
+    
+    if b"rx:" in data:
         response_received = True
+        bytes_received = int(data[3:].decode('ascii'), 16)
+    # Assuming the response contains the string "received" as an acknowledgment
+    #if b"received" in data:
+        #print(f"Received acknowledgment from device: {data}")
+        #response_received = True
     else:
         print(f"Unexpected response from {sender}: {data}")
 
@@ -549,9 +561,11 @@ async def wait_for_response():
 # Define an async function to send a message to the device
 async def send_bytes_to_client(databytes):
     global response_received
+    global bytes_received
 
     max_retries = 5
     timeout_ms = 1000
+    bytes_received = 0
 
     try:
         image_size = len(run_length_decode(databytes))
@@ -566,8 +580,14 @@ async def send_bytes_to_client(databytes):
 
                 print("Sending data to BLE Client")
                 image_bytes_sent = 0
-                for i in range(0, len(databytes), 20):
-                    chunk = databytes[i:i+20]
+                #or i in range(0, len(databytes), 20):
+                while bytes_received < len(databytes):
+                    #chunk = databytes[i:i+20]
+                    if bytes_received+20 < len(databytes):
+                        chunk = databytes[bytes_received:bytes_received+20]
+                    else:
+                        chunk = databytes[bytes_received:]
+
                     decoded_chunk = run_length_decode(chunk)
                     image_bytes_sent = image_bytes_sent + len(decoded_chunk)
                     retries = 0 #initialize retries for each chunk
@@ -578,14 +598,14 @@ async def send_bytes_to_client(databytes):
                             response_received = False  # Reset flag before waiting
                                                         
                             # Send the message to the RXUUID of the Bluetooth device
-                            #await client.write_gatt_char(RX_FIFO_UUID, image_data, response=True)
                             await client.write_gatt_char(RX_FIFO_UUID, chunk)
-                            print(f"Transmitted: {i+20}/{len(databytes)} bytes. Expanded: {image_bytes_sent}/{image_size}\n")
+                            #print(f"Transmitted: {i+20}/{len(databytes)} bytes. Expanded: {image_bytes_sent}/{image_size}\n")
+                            print(f"Transmitted: {bytes_received+len(chunk)}/{len(databytes)} bytes. Expanded: {image_bytes_sent}/{image_size}")
                             
                             try:
                                 await asyncio.wait_for(wait_for_response(), timeout_ms / 1000)
                                 if response_received:
-                                    #print("Response received, proceeding to the next chunk.")
+                                    print(f"Client has received:{bytes_received} bytes")
                                     break
                             except asyncio.TimeoutError:
                                 print(f"No response received within {timeout_ms}ms, retrying... (Attempt {retries+1}/{max_retries})")
@@ -596,7 +616,8 @@ async def send_bytes_to_client(databytes):
                             retries += 1  # Increment retries on exception
                     
                     if retries == max_retries:
-                        print(f"Max retries reached for chunk {i}. Aborting.")
+                        #print(f"Max retries reached for chunk {i}. Aborting.")
+                        print(f"Max retries reached for chunk. Aborting.")
                         break
 
                 print("Data transmission complete\n")
