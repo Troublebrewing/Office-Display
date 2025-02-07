@@ -468,7 +468,7 @@ def ScheduleNextUpdate(focus_event):
 
     print(f"next display update at: {next_time_str}")
 
-    schedule.every().day.at(next_time_str).do(UpdateDisplay)
+    schedule.every().day.at(next_time_str).do(lambda: asyncio.ensure_future(UpdateDisplay))
 
     return schedule.CancelJob
 
@@ -483,9 +483,6 @@ def UpdateEventList():
         print("done")
     except Exception as e:
         print(f"failed{e}")
-
-    
-
 
 # Define a class to represent a BLE device
 class Device:
@@ -518,8 +515,6 @@ async def scan_for_devices():
         print(f"Error during scan: {e}")
         return []
 
-response_received = False
-
 # Callback to handle received notifications
 def notification_handler(sender, data):
     """
@@ -532,21 +527,10 @@ def notification_handler(sender, data):
     
     global response_received
     global bytes_received
-    #print(f"rx data:{data}\n")
-    #print(f"just number portion as bytes:{data[3:]}")
-    #result = data[3:].decode(ascii)
-    #result = data[3:].decode(ascii)
-    #print(f"string:{result}")
-    #number = int(result, 16)
-    #print(f"number:{number}")
     
     if b"rx:" in data:
         response_received = True
         bytes_received = int(data[3:].decode('ascii'), 16)
-    # Assuming the response contains the string "received" as an acknowledgment
-    #if b"received" in data:
-        #print(f"Received acknowledgment from device: {data}")
-        #response_received = True
     else:
         print(f"Unexpected response from {sender}: {data}")
 
@@ -599,7 +583,7 @@ async def send_bytes_to_client(databytes):
                                                         
                             # Send the message to the RXUUID of the Bluetooth device
                             await client.write_gatt_char(RX_FIFO_UUID, chunk)
-                            #print(f"Transmitted: {i+20}/{len(databytes)} bytes. Expanded: {image_bytes_sent}/{image_size}\n")
+                            
                             print(f"Transmitted: {bytes_received+len(chunk)}/{len(databytes)} bytes. Expanded: {image_bytes_sent}/{image_size}")
                             
                             try:
@@ -616,7 +600,6 @@ async def send_bytes_to_client(databytes):
                             retries += 1  # Increment retries on exception
                     
                     if retries == max_retries:
-                        #print(f"Max retries reached for chunk {i}. Aborting.")
                         print(f"Max retries reached for chunk. Aborting.")
                         break
 
@@ -630,24 +613,11 @@ async def send_bytes_to_client(databytes):
 
             else:
                 print("Device is not connected.")
-                #await connect_to_device()
 
     except Exception as e:
         print(f"Error sending message to device: {e}")
 
 async def connect_to_device(address=None):
-    #if address:
-        # Try to connect directly to the provided address
-        #print(f"Attempting to connect to device at address {address}...")
-        #try:
-            #async with BleakClient(address) as client:
-                #if client.is_connected:
-                #    print(f"Successfully connected to device at {address}")
-                #else:
-                #    print(f"Failed to connect to device at {address}")
-        #except Exception as e:
-            #print(f"Error connecting to {address}: {e}")
-    
     if address==None:
         # No address provided, scan for devices
         named_devices = await scan_for_devices()
@@ -699,18 +669,10 @@ async def connect_to_device(address=None):
         else:
             print(f"Failed to connect to device at {address}")
 
-
 epd = epd7in3f.EPD()
-
-
-
 
 utc = pytz.UTC
 #pcp = serial.Serial('COM11', 115200, 8, "N", 1, timeout=10, rtscts=1)
-
-#asyncio.run(connect_to_device(address="FF:B2:EA:E5:D6:24"))
-#asyncio.run(connect_to_device(address="FF:B2:EA:E5:D6:24"))
-#asyncio.run(connect_to_target())
 
 async def main():
     #epd = epd7in3f.EPD()
@@ -721,33 +683,36 @@ async def main():
     #    pcp.write(mystring.encode())
     #    time.sleep(1)
 
+    #to connect to a specific BT target, modify the address below
     await connect_to_device(address="FF:B2:EA:E5:D6:24")
 
+    #if display address is unknown, dont specify address and it will scan and let you choose a device
+    #await connect_to_device()
+    
     global todays_events
     global focus_event
 
+    #clear globals
     todays_events = []
     focus_event = []
 
+    #fetch upcoming event list
     UpdateEventList()
 
+    #initial update of display
     await UpdateDisplay()
 
+    #periodically refresh event list
     schedule.every(15).minutes.do(UpdateEventList)
-    schedule.every(2).minutes.do(UpdateDisplay)
+
+    #periodically update display
+    #schedule.every(2).minutes.do(UpdateDisplay)
 
     while(True):
         schedule.run_pending()
         time.sleep(1)
 
 asyncio.run(main())
-
-#todays_events = []
-#focus_event = []
-
-#first run
-#UpdateEventList()
-#UpdateDisplay()
 
 #schedule runs
 #schedule.every(15).minutes.do(UpdateEventList)
