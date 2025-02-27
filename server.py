@@ -2,6 +2,7 @@
 from PIL import Image
 from PIL import ImageDraw
 from PIL import ImageFont
+from PIL import ImageTk
 
 #library to pack image data for waveshare display
 #this is from the rpi library from the display manufacturer
@@ -38,6 +39,8 @@ if folder_path not in path_env_var:
 #import these libraries for svg conversion
 from svglib.svglib import svg2rlg
 from reportlab.graphics import renderPM
+
+import tkinter as tk
 
 REFRESH_PERIOD_MINUTES = 5
 
@@ -339,6 +342,34 @@ def run_length_decode(data):
 
     return decoded
 
+def review_image(image):
+    """ Displays the image in a tkinter window with 'Update' and 'Skip' buttons """
+    root = tk.Tk()
+    root.title("Preview Image")
+
+    img = ImageTk.PhotoImage(image)
+    panel = tk.Label(root, image=img)
+    panel.pack()
+
+    result = asyncio.Future()
+
+    def update():
+        result.set_result("Update")
+        root.destroy()
+
+    def skip():
+        result.set_result("Skip")
+        root.destroy()
+
+    btn_update = tk.Button(root, text="Update", command=update)
+    btn_update.pack(side="left", padx=10)
+
+    btn_skip = tk.Button(root, text="Skip", command=skip)
+    btn_skip.pack(side="right", padx=10)
+
+    root.mainloop()
+    return result
+
 def bytearray_compare(ba1, ba2):
     length1 = len(ba1)
     length2 = len(ba2)
@@ -387,52 +418,63 @@ async def UpdateDisplay():
         #create image to send
         im = make_image(focus_event)
 
-        #show image
-        #im.show()
+        review_choice = await review_image(im)
 
-        #encode into datastream for waveshare display
-        wavesharebuf = epd.getbuffer(im)
-        #image_bytes = bytes(wavesharebuf)
-        image_bytearray = bytearray(wavesharebuf)
-        #print(f"image bytes: {image_bytearray}\n")
-        
-        RLE_image_bytearray = run_length_encode2(image_bytearray)
-        #RLE_image_bytearray = run_length_encode2(image_bytearray)
-        #print(f"encoded image: {RLE_image_bytearray}\n")
-        #bytearray_compare(RLE_image_bytearray, RLE_image_bytearray2)
-        #decoded = run_length_decode(RLE_image_bytearray)
-        #decoded2 = run_length_decode(RLE_image_bytearray2)
-        #print(f'{decoded}')
-        #print(f'{decoded2}')
+        if review_choice == "Update":
+            #encode into datastream for waveshare display
+            wavesharebuf = epd.getbuffer(im)
 
-        #bytearray_compare(image_bytearray, decoded)
-        #bytearray_compare(image_bytearray, decoded2)
+            #image_bytes = bytes(wavesharebuf)
+            image_bytearray = bytearray(wavesharebuf)
+            #print(f"image bytes: {image_bytearray}\n")
+            
+            RLE_image_bytearray = run_length_encode2(image_bytearray)
+            #RLE_image_bytearray = run_length_encode2(image_bytearray)
+            #print(f"encoded image: {RLE_image_bytearray}\n")
+            #bytearray_compare(RLE_image_bytearray, RLE_image_bytearray2)
+            #decoded = run_length_decode(RLE_image_bytearray)
+            #decoded2 = run_length_decode(RLE_image_bytearray2)
+            #print(f'{decoded}')
+            #print(f'{decoded2}')
 
-        #print(f"wavesharebuf size: {len(wavesharebuf)} RLE size: {len(RLE_wavesharebuf)}")
-        #print(f"image_bytes size: {len(image_bytes)} RLE size: {len(RLE_image_bytes)}")
-        print(f"image_bytearray size: {len(image_bytearray)} RLE size: {len(RLE_image_bytearray)}")
+            #bytearray_compare(image_bytearray, decoded)
+            #bytearray_compare(image_bytearray, decoded2)
 
-        #if(pcp):
+            #print(f"wavesharebuf size: {len(wavesharebuf)} RLE size: {len(RLE_wavesharebuf)}")
+            #print(f"image_bytes size: {len(image_bytes)} RLE size: {len(RLE_image_bytes)}")
+            print(f"image_bytearray size: {len(image_bytearray)} RLE size: {len(RLE_image_bytearray)}")
+
+            #if(pcp):
             #if(test == 0):
             #print("Sending image through serial port...", end='')
             #pcp.write(wavesharebuf)
             #print("done")
 
-        #device_connected=1
-        #if(device_connected):
+            #device_connected=1
+            #if(device_connected):
 
-        #test = bytearray([255] * 510)
-        #print(f"test length: {len(test)}\n")
-        #print(f"test data: {test}\n")
+            #test = bytearray([255] * 510)
+            #print(f"test length: {len(test)}\n")
+            #print(f"test data: {test}\n")
+            
+            #encode_test = run_length_encode2(test)
+            #print(f"encoded test length:{len(encode_test)}\n")
+            #print(f"encoded test data: {encode_test}\n")
+
+            #decode_test = run_length_decode(encode_test)
+            #print(f"decoded test length:{len(decode_test)}\n")
+            #print(f"decoded test: {decode_test}\n")
+            await send_bytes_to_client(RLE_image_bytearray)
+        else:
+            print("User skipped update.")
+
+        #show image
+        #im.show()
+
         
-        #encode_test = run_length_encode2(test)
-        #print(f"encoded test length:{len(encode_test)}\n")
-        #print(f"encoded test data: {encode_test}\n")
+        
 
-        #decode_test = run_length_decode(encode_test)
-        #print(f"decoded test length:{len(decode_test)}\n")
-        #print(f"decoded test: {decode_test}\n")
-        await send_bytes_to_client(RLE_image_bytearray)
+        
     else:
         print(f"Focus event is still {focus_event.summary}. skipping...")
 
@@ -606,7 +648,7 @@ async def send_bytes_to_client(databytes):
                 print("Data transmission complete\n")
 
                 # Stop notifications when done
-                await client.stop_notify(RX_FIFO_UUID)
+                # await client.stop_notify(RX_FIFO_UUID)
 
                 await client.disconnect()
                 return  # Exit function after successful transmission
