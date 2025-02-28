@@ -147,18 +147,44 @@ def make_image(focus_event):
         #bar_y_anchor = 240
         im2.line([(borderwidth+padding, bar_y_anchor),(display_width-borderwidth-padding,bar_y_anchor)],fill=EPD_BLACK, width=20)
 
-        # static status text
-        static_status_y_anchor = 260
-        statusfont = ImageFont.truetype('Inter/static/Inter-Regular.ttf', 35)
-        im2.text((borderwidth+padding, static_status_y_anchor), "STATUS:", font=statusfont, fill=EPD_BLACK)
+        banner_text = "Welcome Jim Bansbach"
+
+        if banner_text == "":
+            # static status text
+            static_status_y_anchor = 260
+            statusfont = ImageFont.truetype('Inter/static/Inter-Regular.ttf', 35)
+            im2.text((borderwidth+padding, static_status_y_anchor), "STATUS:", font=statusfont, fill=EPD_BLACK)
+        
+            status_y_anchor = 280
+        else:
+            static_status_y_anchor = 260
+
+            status = banner_text
 
         # status
         status_y_anchor = 280
-        statusfont2 = ImageFont.truetype('Inter/static/Inter-Bold.ttf', 120)
+        statusfont2_size = 120
+        #statusfont2 = ImageFont.truetype('Inter/static/Inter-Bold.ttf', statusfont2_size)
         statuscolor = bordercolor
-        boundingbox = im2.textbbox((borderwidth+padding, status_y_anchor), status.upper(), font=statusfont2)
-        anchor = (display_width/2)-((boundingbox[2]-boundingbox[0])/2)
-        im2.text((anchor , status_y_anchor), status.upper(), font=statusfont2, fill=statuscolor)
+        #boundingbox = im2.textbbox((borderwidth+padding, status_y_anchor), status.upper(), font=statusfont2)
+        #anchor = (display_width/2)-((boundingbox[2]-boundingbox[0])/2)
+        #im2.text((anchor , status_y_anchor), "FRIDAY", font=statusfont2, fill=statuscolor)
+        # Center and dynamically size the status text
+        max_width = display_width - 2 * (borderwidth + padding)
+
+        while True:
+            statusfont2 = ImageFont.truetype('Inter/static/Inter-Bold.ttf', statusfont2_size)
+            boundingbox = im2.textbbox((0, 0), status.upper(), font=statusfont2)
+            #anchor = (display_width/2)-((boundingbox[2]-boundingbox[0])/2)
+            text_width = boundingbox[2] - boundingbox[0]
+            text_height = boundingbox[3] - boundingbox[1]
+            if text_width <= max_width:
+                break
+            statusfont2_size -= 1
+
+        anchor_x = (display_width - text_width) / 2
+        anchor_y = (status_y_anchor+(( display_height - status_y_anchor - borderwidth - padding)) / 2) - text_height
+        im2.text((anchor_x, anchor_y), status.upper(), font=statusfont2, fill=statuscolor)
 
         # available
         if(focus_event is not None):
@@ -726,7 +752,7 @@ async def main():
     #    time.sleep(1)
 
     #to connect to a specific BT target, modify the address below
-    await connect_to_device(address="FF:B2:EA:E5:D6:24")
+    #await connect_to_device(address="FF:B2:EA:E5:D6:24")
 
     #if display address is unknown, dont specify address and it will scan and let you choose a device
     #await connect_to_device()
@@ -745,7 +771,7 @@ async def main():
     await UpdateDisplay()
 
     #periodically refresh event list
-    schedule.every(15).minutes.do(UpdateEventList)
+    #schedule.every(15).minutes.do(UpdateEventList)
 
     #periodically update display
     #schedule.every(2).minutes.do(UpdateDisplay)
