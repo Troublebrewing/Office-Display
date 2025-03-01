@@ -96,7 +96,7 @@ class App:
             thumbnail_img.thumbnail((180, 200))
             thumbnail_img = ImageTk.PhotoImage(thumbnail_img)
             #self.image_list.append(img)
-            self.thumbnail_list.append(thumbnail_img)
+            #self.thumbnail_list.append(thumbnail_img)
             label = tk.Label(self.scrollable_frame, image=thumbnail_img)
             label.image = thumbnail_img
             label.pack(padx=10, pady=10)
@@ -132,7 +132,7 @@ class App:
             label = tk.Label(self.scrollable_frame, image=thumbnail_img)
             label.image = thumbnail_img
             label.pack(padx=10, pady=10)
-            label.bind("<Button-1>", lambda e, img=preset: self.display_image(ImageTk.PhotoImage(preset)))
+            label.bind("<Button-1>", lambda e, preset=preset: self.display_image(ImageTk.PhotoImage(preset)))
         
         # Update the scroll region after loading all thumbnails
         self.left_canvas.configure(scrollregion=self.scrollable_frame.bbox("all"))
