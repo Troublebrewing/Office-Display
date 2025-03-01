@@ -2,8 +2,6 @@ import tkinter as tk
 from tkinter import ttk
 from PIL import Image, ImageTk
 
-import preset1
-
 theme = "dark"
 
 if theme == "dark":
@@ -58,8 +56,16 @@ class App:
         #self.right_frame.pack(side=tk.RIGHT, fill=tk.BOTH, expand=True)
         self.right_frame.pack(side=tk.RIGHT)
         
+        self.tabControl = ttk.Notebook(self.right_frame) 
+        self.tab1 = ttk.Frame(self.tabControl) 
+        self.preview_tab = ttk.Frame(self.tabControl) 
+        
+        self.tabControl.add(self.tab1, text ='Customize') 
+        self.tabControl.add(self.preview_tab, text ='Preview') 
+        self.tabControl.pack(expand = 1, fill ="both") 
+
         # Canvas for displaying the selected image
-        self.canvas = tk.Canvas(self.right_frame, width=800, height=480, bg=bg_color)
+        self.canvas = tk.Canvas(self.preview_tab, width=800, height=480, bg=bg_color)
         self.canvas.pack()
 
         # Buttons below the image
@@ -106,14 +112,18 @@ class App:
         self.left_canvas.configure(scrollregion=self.scrollable_frame.bbox("all"))
 
     def load_presets(self):
+        import template_status
+        import template_banner
+        import template_image_full
+        
         self.preset_list = []
 
-        p1 = preset1.Presetx(status="Available")
-        p2 = preset1.Presetx(name="Tyler Bules", status="Available")
-        p3 = preset1.Presetx(status="Away2")
-        p4 = preset1.Presetx(title="buttsniffer", status="Available")
-        p5 = preset1.Presetx(status="Out of Office")
-        p6 = preset1.Presetx(name="King Arthur", title="fastest kid alive", status="Available")
+        p1 = template_banner.Presetx(text="Banner Text")
+        p2 = template_status.Presetx(name="Tyler Bules", status="Available")
+        p3 = template_image_full.Presetx(image_filename="SVG Art/Aperture_Science.svg")
+        p4 = template_image_full.Presetx(image_filename="SVG Art/lumon.svg")
+        p5 = template_image_full.Presetx(image_filename="SVG Art/Dixon Logo Mono (No Tagline).svg")
+        p6 = template_image_full.Presetx(image_filename="SVG Art/Dixon Logo Mono (Tagline).svg")
 
         self.preset_list.append(p1.im)
         self.preset_list.append(p2.im)
@@ -129,10 +139,10 @@ class App:
             thumbnail_img = ImageTk.PhotoImage(thumbnail_img)
             #self.image_list.append(img)
             #self.thumbnail_list.append(thumbnail_img)
-            label = tk.Label(self.scrollable_frame, image=thumbnail_img)
+            label = tk.Label(self.scrollable_frame, image=thumbnail_img, width=200, height=120, bg=bg_color)
             label.image = thumbnail_img
-            label.pack(padx=10, pady=10)
-            label.bind("<Button-1>", lambda e, preset=preset: self.display_image(ImageTk.PhotoImage(preset)))
+            label.pack(padx=0, pady=0)
+            label.bind("<Button-1>", lambda e, preset=preset: [self.display_image(ImageTk.PhotoImage(preset)), self.change_bg_color(label)])
         
         # Update the scroll region after loading all thumbnails
         self.left_canvas.configure(scrollregion=self.scrollable_frame.bbox("all"))
@@ -140,6 +150,10 @@ class App:
     def display_image(self, img):
         self.canvas.create_image(0, 0, anchor=tk.NW, image=img)
         self.canvas.image = img
+
+    def change_bg_color(self, label):
+        label.config(bg="white")
+        label.update()
 
 if __name__ == "__main__":
     root = tk.Tk()
