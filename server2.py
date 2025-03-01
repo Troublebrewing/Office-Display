@@ -2,6 +2,8 @@ import tkinter as tk
 from tkinter import ttk
 from PIL import Image, ImageTk
 
+import preset1
+
 theme = "dark"
 
 if theme == "dark":
@@ -71,7 +73,12 @@ class App:
         self.button2.pack(side=tk.RIGHT, padx=10, pady=10)
 
         # Load thumbnails and bind listbox selection
-        self.load_thumbnails()
+        #self.load_thumbnails()
+        self.load_presets()
+
+        #test = preset1.Presetx(status="Available")
+        #test = preset1.Presetx(name="Tyler Bules", title="Electrical Engineering Manager", status="Out")
+        #test.im.show()
         #self.listbox.bind('<<ListboxSelect>>', self.on_thumbnail_select)
 
     def _on_mouse_wheel(self, event):
@@ -94,6 +101,38 @@ class App:
             label.image = thumbnail_img
             label.pack(padx=10, pady=10)
             label.bind("<Button-1>", lambda e, img=img: self.display_image(ImageTk.PhotoImage(img)))
+        
+        # Update the scroll region after loading all thumbnails
+        self.left_canvas.configure(scrollregion=self.scrollable_frame.bbox("all"))
+
+    def load_presets(self):
+        self.preset_list = []
+
+        p1 = preset1.Presetx(status="Available")
+        p2 = preset1.Presetx(name="Tyler Bules", status="Available")
+        p3 = preset1.Presetx(status="Away2")
+        p4 = preset1.Presetx(title="buttsniffer", status="Available")
+        p5 = preset1.Presetx(status="Out of Office")
+        p6 = preset1.Presetx(name="King Arthur", title="fastest kid alive", status="Available")
+
+        self.preset_list.append(p1.im)
+        self.preset_list.append(p2.im)
+        self.preset_list.append(p3.im)
+        self.preset_list.append(p4.im)
+        self.preset_list.append(p5.im)
+        self.preset_list.append(p6.im)
+
+        for preset in self.preset_list:
+            #img = Image.open(thumbnail_file)
+            thumbnail_img = preset.copy()
+            thumbnail_img.thumbnail((180, 200))
+            thumbnail_img = ImageTk.PhotoImage(thumbnail_img)
+            #self.image_list.append(img)
+            #self.thumbnail_list.append(thumbnail_img)
+            label = tk.Label(self.scrollable_frame, image=thumbnail_img)
+            label.image = thumbnail_img
+            label.pack(padx=10, pady=10)
+            label.bind("<Button-1>", lambda e, img=preset: self.display_image(ImageTk.PhotoImage(preset)))
         
         # Update the scroll region after loading all thumbnails
         self.left_canvas.configure(scrollregion=self.scrollable_frame.bbox("all"))
