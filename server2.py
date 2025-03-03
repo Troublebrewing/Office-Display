@@ -2,6 +2,8 @@ import tkinter as tk
 from tkinter import ttk
 from PIL import Image, ImageTk
 
+import json
+
 theme = "dark"
 
 if theme == "dark":
@@ -112,9 +114,27 @@ class App:
         self.left_canvas.configure(scrollregion=self.scrollable_frame.bbox("all"))
 
     def load_presets(self):
+        with open('presets.json', 'r') as file:
+            presets_data = json.load(file)
+
+        self.preset_list = []
+
+        for preset_info in presets_data['presets']:
+            module_name = preset_info['module']
+            class_name = preset_info['class']
+            #params = preset_info['params']
+
+            module = __import__(module_name)
+            preset_class = getattr(module, class_name)
+            preset_instance = preset_class(**params)
+            
+            self.preset_list.append(preset_instance.im)
+
         import template_status
         import template_banner
         import template_image_full
+        
+
         
         self.preset_list = []
 
