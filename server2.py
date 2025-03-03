@@ -14,7 +14,7 @@ if theme == "light":
 class App:
     def __init__(self, root):
         self.root = root
-        self.root.geometry("1020x530")
+        self.root.geometry("1020x560")
         self.root.resizable(False, False)
         self.root.title("Image Viewer")
 
@@ -62,7 +62,7 @@ class App:
         
         self.tabControl.add(self.tab1, text ='Customize') 
         self.tabControl.add(self.preview_tab, text ='Preview') 
-        self.tabControl.pack(expand = 1, fill ="both") 
+        self.tabControl.pack(expand = 1) 
 
         # Canvas for displaying the selected image
         self.canvas = tk.Canvas(self.preview_tab, width=800, height=480, bg=bg_color)
@@ -118,12 +118,12 @@ class App:
         
         self.preset_list = []
 
-        p1 = template_banner.Presetx(text="Banner Text")
-        p2 = template_status.Presetx(name="Tyler Bules", status="Available")
+        p1 = template_banner.Presetx(text="Welcome Jim Bansbach")
+        p2 = template_status.Presetx(name="Tyler Bules", title="Electrical Engineering Manager", status="Available")
         p3 = template_image_full.Presetx(image_filename="SVG Art/Aperture_Science.svg")
         p4 = template_image_full.Presetx(image_filename="SVG Art/lumon.svg")
         p5 = template_image_full.Presetx(image_filename="SVG Art/Dixon Logo Mono (No Tagline).svg")
-        p6 = template_image_full.Presetx(image_filename="SVG Art/Dixon Logo Mono (Tagline).svg")
+        p6 = template_image_full.Presetx(image_filename="scalar_image.png")
 
         self.preset_list.append(p1.im)
         self.preset_list.append(p2.im)

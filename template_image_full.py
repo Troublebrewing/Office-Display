@@ -56,10 +56,10 @@ class Presetx:
             max_image_height = display_height - 2 * padding
 
             try:
-                if self.scalar_image.height > self.scalar_image.width:
+                if self.scalar_image.height > max_image_height:
                     #portrait image. scale via height
                     self.scalar_image = self.scalar_image.resize((int(max_image_height * self.aspect_ratio), max_image_height))
-                else:
+                if self.scalar_image.width > max_image_width:
                     #landscape image. scale via width
                     self.scalar_image = self.scalar_image.resize((max_image_width, int(max_image_width / self.aspect_ratio)))
             except Exception as e:
