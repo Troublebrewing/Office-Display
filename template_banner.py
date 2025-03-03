@@ -6,15 +6,14 @@ from PIL import ImageTk
 
 import datetime
 
-#import these libraries for svg conversion
-from svglib.svglib import svg2rlg
-from reportlab.graphics import renderPM
-
-class Presetx:
+class template_banner:
     def __init__(self, text="Banner Text", color="black"):
         self.text = text  
         self.color = color      
 
+    fields = ['text', 'color']
+
+    def render(self):
         display_width = 800
         display_height = 480
 

@@ -6,13 +6,24 @@ from PIL import ImageTk
 
 import datetime
 
+#cairo has some external dependencies
+import os
+folder_path = os.path.abspath("./cairo/bin/")
+path_env_var = os.environ["PATH"]
+if folder_path not in path_env_var:
+    os.environ["PATH"] = folder_path + os.pathsep + path_env_var
+    
 #import these libraries for svg conversion
 from svglib.svglib import svg2rlg
 from reportlab.graphics import renderPM
 
-class Presetx:
+class template_image_full:
     def __init__(self, image_filename = ""):
         self.image_filename = image_filename
+
+    fields = ['image_filename']
+
+    def render(self):
         self.scalar_image = None
         display_width = 800
         display_height = 480

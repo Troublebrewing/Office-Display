@@ -6,17 +6,27 @@ from PIL import ImageTk
 
 import datetime
 
+#cairo has some external dependencies
+import os
+folder_path = os.path.abspath("./cairo/bin/")
+path_env_var = os.environ["PATH"]
+if folder_path not in path_env_var:
+    os.environ["PATH"] = folder_path + os.pathsep + path_env_var
+    
 #import these libraries for svg conversion
 from svglib.svglib import svg2rlg
 from reportlab.graphics import renderPM
 
-class Presetx:
+class template_status:
     def __init__(self, name="Dixon Dan", title="Head Honcho", badge="", status="Available"):
         self.name = name
         self.title = title
         self.badge = badge
         self.status = status
+    
+    fields = ['name', 'title', 'badge', 'status']
 
+    def render(self):
         display_width = 800
         display_height = 480
 
@@ -35,11 +45,11 @@ class Presetx:
         EPD_ORANGE  = 0x007DFF
         
         bordercolor = "white"
-        if status == "Focus":
+        if self.status == "Focus":
             bordercolor = EPD_YELLOW
-        if (status == "Busy") or (status == "Out of Office"):
+        if (self.status == "Busy") or (self.status == "Out of Office"):
             bordercolor = EPD_RED
-        if status == "Available":
+        if self.status == "Available":
             bordercolor = EPD_GREEN
 
         #outline

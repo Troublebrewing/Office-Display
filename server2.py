@@ -119,38 +119,54 @@ class App:
 
         self.preset_list = []
 
+        #for preset_info in presets_data['presets']:
+        #    module_name = preset_info['module']
+        #    class_name = preset_info['class']
+            #params = preset_info['params']
+
+        #    module = __import__(module_name)
+        #    preset_class = getattr(module, class_name)
+            #preset_instance = preset_class(**params)
+            
+            #self.preset_list.append(preset_instance.im)
         for preset_info in presets_data['presets']:
             module_name = preset_info['module']
-            class_name = preset_info['class']
+            class_name = module_name
             #params = preset_info['params']
 
             module = __import__(module_name)
             preset_class = getattr(module, class_name)
-            preset_instance = preset_class(**params)
+            preset_instance = preset_class()
             
+            for field in preset_class.fields:
+                if field in preset_info:
+                    setattr(preset_instance, field, preset_info[field])
+
+            preset_instance.render()
+
             self.preset_list.append(preset_instance.im)
 
-        import template_status
-        import template_banner
-        import template_image_full
+        #import template_status
+        #import template_banner
+        #import template_image_full
         
 
         
-        self.preset_list = []
+        #self.preset_list = []
 
-        p1 = template_banner.Presetx(text="Welcome Jim Bansbach")
-        p2 = template_status.Presetx(name="Tyler Bules", title="Electrical Engineering Manager", status="Available")
-        p3 = template_image_full.Presetx(image_filename="SVG Art/Aperture_Science.svg")
-        p4 = template_image_full.Presetx(image_filename="SVG Art/lumon.svg")
-        p5 = template_image_full.Presetx(image_filename="SVG Art/Dixon Logo Mono (No Tagline).svg")
-        p6 = template_image_full.Presetx(image_filename="scalar_image.png")
+        #p1 = template_banner.Presetx(text="Welcome Jim Bansbach")
+        #p2 = template_status.Presetx(name="Tyler Bules", title="Electrical Engineering Manager", status="Available")
+        #p3 = template_image_full.Presetx(image_filename="SVG Art/Aperture_Science.svg")
+        #p4 = template_image_full.Presetx(image_filename="SVG Art/lumon.svg")
+        #p5 = template_image_full.Presetx(image_filename="SVG Art/Dixon Logo Mono (No Tagline).svg")
+        #p6 = template_image_full.Presetx(image_filename="scalar_image.png")
 
-        self.preset_list.append(p1.im)
-        self.preset_list.append(p2.im)
-        self.preset_list.append(p3.im)
-        self.preset_list.append(p4.im)
-        self.preset_list.append(p5.im)
-        self.preset_list.append(p6.im)
+        #self.preset_list.append(p1.im)
+        #self.preset_list.append(p2.im)
+        #self.preset_list.append(p3.im)
+        #self.preset_list.append(p4.im)
+        #self.preset_list.append(p5.im)
+        #self.preset_list.append(p6.im)
 
         for preset in self.preset_list:
             #img = Image.open(thumbnail_file)

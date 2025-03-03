@@ -2,7 +2,6 @@
     "presets": [
         {
             "module": "template_banner",
-            "class": "Presetx",
             "text": "Welcome Jim Bansbach"
         },
         {
@@ -13,23 +12,19 @@
         
         },
         {
-            "module":"template_banner",
-            "class": "Presetx",
+            "module":"template_image_full",
             "image_filename": "SVG Art/Aperture_Science.svg"
         },
         {
-            "module":"template_banner",
-            "class": "Presetx",
+            "module":"template_image_full",
             "image_filename": "SVG Art/lumon.svg"
         },
         {
-            "module":"template_banner",
-            "class": "Presetx",
+            "module":"template_image_full",
             "image_filename": "SVG Art/Dixon Logo Mono (No Tagline).svg"
         },
         {
-            "module":"template_banner",
-            "class": "Presetx",
+            "module":"template_image_full",
             "image_filename": "scalar_image.png"
         }
     ]
