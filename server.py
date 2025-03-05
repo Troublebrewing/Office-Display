@@ -147,7 +147,7 @@ def make_image(focus_event):
         #bar_y_anchor = 240
         im2.line([(borderwidth+padding, bar_y_anchor),(display_width-borderwidth-padding,bar_y_anchor)],fill=EPD_BLACK, width=20)
 
-        banner_text = "Welcome Jim Bansbach"
+        banner_text = "Welcome Bob Grace"
 
         if banner_text == "":
             # static status text
@@ -752,7 +752,7 @@ async def main():
     #    time.sleep(1)
 
     #to connect to a specific BT target, modify the address below
-    #await connect_to_device(address="FF:B2:EA:E5:D6:24")
+    await connect_to_device(address="FF:B2:EA:E5:D6:24")
 
     #if display address is unknown, dont specify address and it will scan and let you choose a device
     #await connect_to_device()

@@ -18,13 +18,14 @@ from svglib.svglib import svg2rlg
 from reportlab.graphics import renderPM
 
 class template_status:
-    def __init__(self, name="Dixon Dan", title="Head Honcho", badge="", status="Available"):
+    def __init__(self, name="Dixon Dan", title="Head Honcho", badge="", status="Available", banner_text=""):
         self.name = name
         self.title = title
         self.badge = badge
         self.status = status
+        self.banner_text = banner_text
     
-    fields = ['name', 'title', 'badge', 'status']
+    fields = ['name', 'title', 'badge', 'status', 'banner_text']
 
     def render(self):
         display_width = 800
@@ -75,7 +76,7 @@ class template_status:
 
             try:
                 self.badge = Image.open("badge.png")
-                aspect_ratio = badge.width / badge.height
+                aspect_ratio = self.badge.width / self.badge.height
             except:
                 print("no badge image file found")
 
@@ -95,10 +96,10 @@ class template_status:
 
             #dixon_logo = dixon_logo.resize((logo_height,int(logo_height/aspect_ratio)))
             #im2.bitmap((borderwidth+padding+380, borderwidth+padding), dixon_logo, fill="blue")
-            #badge_x_anchor = int(((((display_width)+530)/2))-(self.badge.width/2))
-            #bar_y_anchor = 240
-            #badge_y_anchor = int((bar_y_anchor/2)-(self.badge.height/2))
-            #self.im.paste(self.badge,(badge_x_anchor, badge_y_anchor))
+            badge_x_anchor = int(((((display_width)+530)/2))-(self.badge.width/2))
+            bar_y_anchor = 240
+            badge_y_anchor = int((bar_y_anchor/2)-(self.badge.height/2))
+            self.im.paste(self.badge,(badge_x_anchor, badge_y_anchor))
 
             # name
             name_y_anchor = 70
@@ -111,12 +112,10 @@ class template_status:
             self.im2.text((borderwidth+padding, title_y_anchor), self.title, font=titlefont, fill=EPD_BLUE)
 
             # bar
-            bar_y_anchor = 240
+            #bar_y_anchor = 240
             self.im2.line([(borderwidth+padding, bar_y_anchor),(display_width-borderwidth-padding,bar_y_anchor)],fill=EPD_BLACK, width=20)
 
-            banner_text = "Welcome Jim Bansbach"
-
-            if banner_text == "":
+            if self.banner_text == "":
                 # static status text
                 static_status_y_anchor = 260
                 statusfont = ImageFont.truetype('Inter_28pt-Regular.ttf', 35)
@@ -126,7 +125,7 @@ class template_status:
             else:
                 static_status_y_anchor = 260
 
-                status = banner_text
+                self.status = self.banner_text
 
             # status
             status_y_anchor = 280
@@ -141,7 +140,7 @@ class template_status:
 
             while True:
                 statusfont2 = ImageFont.truetype('Inter_28pt-Bold.ttf', statusfont2_size)
-                boundingbox = self.im2.textbbox((0, 0), status.upper(), font=statusfont2)
+                boundingbox = self.im2.textbbox((0, 0), self.status.upper(), font=statusfont2)
                 #anchor = (display_width/2)-((boundingbox[2]-boundingbox[0])/2)
                 text_width = boundingbox[2] - boundingbox[0]
                 text_height = boundingbox[3] - boundingbox[1]
@@ -151,7 +150,7 @@ class template_status:
 
             anchor_x = (display_width - text_width) / 2
             anchor_y = (status_y_anchor+(( display_height - status_y_anchor - borderwidth - padding)) / 2) - text_height
-            self.im2.text((anchor_x, anchor_y), status.upper(), font=statusfont2, fill=statuscolor)
+            self.im2.text((anchor_x, anchor_y), self.status.upper(), font=statusfont2, fill=statuscolor)
 
             # available
             #if(focus_event is not None):

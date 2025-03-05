@@ -4,6 +4,9 @@ from PIL import Image, ImageTk
 
 import json
 
+import asyncio
+from bleak import BleakClient, BleakScanner
+
 theme = "dark"
 
 if theme == "dark":
@@ -59,10 +62,13 @@ class App:
         self.right_frame.pack(side=tk.RIGHT)
         
         self.tabControl = ttk.Notebook(self.right_frame) 
-        self.tab1 = ttk.Frame(self.tabControl) 
-        self.preview_tab = ttk.Frame(self.tabControl) 
+        self.customize_tab = ttk.Frame(self.tabControl, style="Custom.TFrame")
+        self.preview_tab = ttk.Frame(self.tabControl, style="Custom.TFrame")
+        style = ttk.Style()
+        style.configure("Custom.TFrame", background=bg_color)
+         
         
-        self.tabControl.add(self.tab1, text ='Customize') 
+        self.tabControl.add(self.customize_tab, text ='Customize') 
         self.tabControl.add(self.preview_tab, text ='Preview') 
         self.tabControl.pack(expand = 1) 
 
@@ -71,106 +77,86 @@ class App:
         self.canvas.pack()
 
         # Buttons below the image
-        self.button_frame = tk.Frame(self.right_frame, bg=bg_color)
-        self.button_frame.pack(fill=tk.X)
+        self.control_frame = tk.Frame(self.right_frame, bg=bg_color)
+        self.control_frame.pack(fill=tk.X)
 
-        self.button1 = tk.Button(self.button_frame, text="Refresh")
-        self.button1.pack(side=tk.LEFT, padx=10, pady=10)
+        self.refresh_button = tk.Button(self.control_frame, text="Refresh")
+        self.refresh_button.pack(side=tk.LEFT, padx=10, pady=10)
+        self.refresh_button.config(command=self.refresh)
 
-        self.button2 = tk.Button(self.button_frame, text="Upload")
-        self.button2.pack(side=tk.RIGHT, padx=10, pady=10)
+        self.upload_button = tk.Button(self.control_frame, text="Upload")
+        self.upload_button.pack(side=tk.RIGHT, padx=10, pady=10)
 
+        self.dropdown_var = tk.StringVar(self.control_frame) 
+        #self.dropdown_var.set("Option 1")  # default value
+
+        self.dropdown_menu = ttk.Combobox(self.control_frame, textvariable=self.dropdown_var, state="readonly")
+        self.dropdown_menu.pack(side=tk.RIGHT, padx=10, pady=10)
+        
         # Load thumbnails and bind listbox selection
         #self.load_thumbnails()
         self.load_presets()
+
+        
+        # No address provided, scan for devices
+        self.refresh()
 
         #test = preset1.Presetx(status="Available")
         #test = preset1.Presetx(name="Tyler Bules", title="Electrical Engineering Manager", status="Out")
         #test.im.show()
         #self.listbox.bind('<<ListboxSelect>>', self.on_thumbnail_select)
 
+    def refresh(self):
+        print("Refreshing...")
+        asyncio.run(self.scan_for_devices())
+        #asyncio.create_task(self.scan_for_devices())
+
     def _on_mouse_wheel(self, event):
         self.left_canvas.yview_scroll(int(-1*(event.delta/120)), "units")
 
-    def load_thumbnails(self):
-        self.image_list = []
-        self.thumbnail_list = []
-
-        self.preset_thumbnail_filenames = ["thumb1.bmp", "thumb2.bmp", "thumb3.bmp","thumb1.bmp", "thumb2.bmp", "thumb3.bmp","thumb1.bmp", "thumb2.bmp", "thumb3.bmp","thumb1.bmp", "thumb2.bmp", "thumb3.bmp"]
-        
-        for thumbnail_file in self.preset_thumbnail_filenames:
-            img = Image.open(thumbnail_file)
-            thumbnail_img = img.copy()
-            thumbnail_img.thumbnail((180, 200))
-            thumbnail_img = ImageTk.PhotoImage(thumbnail_img)
-            #self.image_list.append(img)
-            #self.thumbnail_list.append(thumbnail_img)
-            label = tk.Label(self.scrollable_frame, image=thumbnail_img)
-            label.image = thumbnail_img
-            label.pack(padx=10, pady=10)
-            label.bind("<Button-1>", lambda e, img=img: self.display_image(ImageTk.PhotoImage(img)))
-        
-        # Update the scroll region after loading all thumbnails
-        self.left_canvas.configure(scrollregion=self.scrollable_frame.bbox("all"))
-
     def load_presets(self):
-        with open('presets.json', 'r') as file:
-            presets_data = json.load(file)
+        try:
+            with open('presets.json', 'r') as file:
+                presets_data = json.load(file)
+        except Exception as e:
+            print(f"Unable to open presets.json file: {e}")
 
         self.preset_list = []
 
-        #for preset_info in presets_data['presets']:
-        #    module_name = preset_info['module']
-        #    class_name = preset_info['class']
-            #params = preset_info['params']
+        if presets_data is not None:
+            for preset_info in presets_data['presets']:
+                try:
+                    module_name = preset_info['module']
+                    class_name = module_name                    
 
-        #    module = __import__(module_name)
-        #    preset_class = getattr(module, class_name)
-            #preset_instance = preset_class(**params)
-            
-            #self.preset_list.append(preset_instance.im)
-        for preset_info in presets_data['presets']:
-            module_name = preset_info['module']
-            class_name = module_name
-            #params = preset_info['params']
+                    #import module
+                    module = __import__(module_name)
+                    
+                    #get class from module
+                    preset_class = getattr(module, class_name)
+                    
+                    #create instance of class
+                    preset_instance = preset_class()
+                
+                    #set fields from json data
+                    for field in preset_class.fields:
+                        if field in preset_info:
+                            setattr(preset_instance, field, preset_info[field])
 
-            module = __import__(module_name)
-            preset_class = getattr(module, class_name)
-            preset_instance = preset_class()
-            
-            for field in preset_class.fields:
-                if field in preset_info:
-                    setattr(preset_instance, field, preset_info[field])
+                    #render image
+                    preset_instance.render()
 
-            preset_instance.render()
-
-            self.preset_list.append(preset_instance.im)
-
-        #import template_status
-        #import template_banner
-        #import template_image_full
-        
-
-        
-        #self.preset_list = []
-
-        #p1 = template_banner.Presetx(text="Welcome Jim Bansbach")
-        #p2 = template_status.Presetx(name="Tyler Bules", title="Electrical Engineering Manager", status="Available")
-        #p3 = template_image_full.Presetx(image_filename="SVG Art/Aperture_Science.svg")
-        #p4 = template_image_full.Presetx(image_filename="SVG Art/lumon.svg")
-        #p5 = template_image_full.Presetx(image_filename="SVG Art/Dixon Logo Mono (No Tagline).svg")
-        #p6 = template_image_full.Presetx(image_filename="scalar_image.png")
-
-        #self.preset_list.append(p1.im)
-        #self.preset_list.append(p2.im)
-        #self.preset_list.append(p3.im)
-        #self.preset_list.append(p4.im)
-        #self.preset_list.append(p5.im)
-        #self.preset_list.append(p6.im)
+                    #append image to list
+                    self.preset_list.append(preset_instance)
+                except Exception as e:
+                    print(f"Error loading preset: {e}")
 
         for preset in self.preset_list:
+            #render image
+            preset.render()
+            
             #img = Image.open(thumbnail_file)
-            thumbnail_img = preset.copy()
+            thumbnail_img = preset.im.copy()
             thumbnail_img.thumbnail((180, 200))
             thumbnail_img = ImageTk.PhotoImage(thumbnail_img)
             #self.image_list.append(img)
@@ -178,18 +164,59 @@ class App:
             label = tk.Label(self.scrollable_frame, image=thumbnail_img, width=200, height=120, bg=bg_color)
             label.image = thumbnail_img
             label.pack(padx=0, pady=0)
-            label.bind("<Button-1>", lambda e, preset=preset: [self.display_image(ImageTk.PhotoImage(preset)), self.change_bg_color(label)])
+            label.bind("<Button-1>", lambda e, preset=preset: [self.thumbnail_select(preset, self.change_bg_color(label))])
         
         # Update the scroll region after loading all thumbnails
         self.left_canvas.configure(scrollregion=self.scrollable_frame.bbox("all"))
 
-    def display_image(self, img):
+    def thumbnail_select(self, preset, label):
+        #render full size image into preview tab
+        preset.render()
+        img=ImageTk.PhotoImage(preset.im)
         self.canvas.create_image(0, 0, anchor=tk.NW, image=img)
         self.canvas.image = img
+
+        #erase all widgets in customize tab
+        for widget in self.customize_tab.winfo_children():
+            widget.destroy()
+
+        #render configurable fields into customize tab
+        #preset_fields = img.preset.fields
+        preset_fields = ['name', 'title', 'badge', 'status', 'banner_text']
+        for field in preset_fields:
+            label = tk.Label(self.customize_tab, text=field, bg=bg_color, fg=fg_color)
+            label.pack(anchor='w', padx=10, pady=5)
+            entry = tk.Entry(self.customize_tab)
+            entry.pack(anchor='w', padx=10, pady=5)
+            #entry.insert(0, getattr(img.preset, field, ''))
 
     def change_bg_color(self, label):
         label.config(bg="white")
         label.update()
+
+    # Define a function to scan for BLE devices
+    async def scan_for_devices(self):
+        try:
+            print("Scanning for BLE devices...")
+            devices = await BleakScanner.discover(timeout=5.0)
+            print(f"Scan complete. Found {len(devices)} devices.")
+
+            self.named_bt_devices_found = [device for device in devices if device.name]
+            
+            if not self.named_bt_devices_found:
+                print("No devices with names found.")
+                return None
+            
+            print("Available devices:")
+            for i, device in enumerate(self.named_bt_devices_found):
+                print(f"{i + 1}. {device.name} - {device.address}")
+                self.dropdown_menu['values'] = [device.name for device in self.named_bt_devices_found]
+
+
+
+        except Exception as e:
+            print(f"Error during scan: {e}")
+            return []
 
 if __name__ == "__main__":
     root = tk.Tk()
