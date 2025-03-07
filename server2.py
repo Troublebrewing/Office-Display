@@ -6,6 +6,7 @@ from PIL import Image, ImageTk
 import json
 
 import asyncio
+import threading
 from bleak import BleakClient, BleakScanner
 
 class PresetListFrame(customtkinter.CTkScrollableFrame):
@@ -13,7 +14,7 @@ class PresetListFrame(customtkinter.CTkScrollableFrame):
         super().__init__(master)        
         self.title = "Presets"    
 
-        #self.configure(border_width=0, ipadx=0, ipady=0, padx=0, pady=0)
+        #self.configure(fg_color="red")
 
 class App(customtkinter.CTk):
     def __init__(self):
@@ -38,7 +39,6 @@ class App(customtkinter.CTk):
         # Right frame for image display and buttons
         self.right_frame = customtkinter.CTkFrame(self)
         self.right_frame.grid(row=0, column=1, padx=0, pady=0, rowspan=2, sticky="nsew")
-
         self.right_frame.grid_columnconfigure(0, weight=1)
         self.right_frame.grid_rowconfigure(0, weight=1)
         
@@ -62,10 +62,10 @@ class App(customtkinter.CTk):
         self.upload_button = customtkinter.CTkButton(self.control_frame, text="Upload", command=self.upload)
         self.upload_button.pack(side=tk.RIGHT, padx=10, pady=10)
 
-        self.dropdown_var = customtkinter.StringVar(self.control_frame) 
-        self.dropdown_var.set("Option 1")  # default value
+        self.selected_bt_device = customtkinter.StringVar(self.control_frame) 
+        #self.dropdown_var.set("Option 1")  # default value
 
-        self.dropdown_menu = customtkinter.CTkComboBox(self.control_frame, variable=self.dropdown_var, state="readonly")
+        self.dropdown_menu = customtkinter.CTkComboBox(self.control_frame, variable=self.selected_bt_device, state="readonly")
         self.dropdown_menu.pack(side=tk.RIGHT, padx=10, pady=10)
         
         # Load thumbnails and bind listbox selection        
@@ -75,8 +75,14 @@ class App(customtkinter.CTk):
 
         self.selected_preset = self.preset_list[0]
         
+        # Start the asyncio event loop integration
+        self.loop = asyncio.new_event_loop()
+        threading.Thread(target=self.run_event_loop, daemon=True).start()
+        
         # No address provided, scan for devices
-        #asyncio.create_task(self.refresh())
+        self.refresh()
+
+        
 
         #test = preset1.Presetx(status="Available")
         #test = preset1.Presetx(name="Tyler Bules", title="Electrical Engineering Manager", status="Out")
@@ -85,6 +91,127 @@ class App(customtkinter.CTk):
 
     def upload(self):
         print("Uploading...")
+        self.selected_bt_device
+
+        #encode into datastream for waveshare display
+        wavesharebuf = epd.getbuffer(im)
+
+        #image_bytes = bytes(wavesharebuf)
+        image_bytearray = bytearray(wavesharebuf)
+        #print(f"image bytes: {image_bytearray}\n")
+        
+        RLE_image_bytearray = run_length_encode2(image_bytearray)
+        #RLE_image_bytearray = run_length_encode2(image_bytearray)
+        #print(f"encoded image: {RLE_image_bytearray}\n")
+        #bytearray_compare(RLE_image_bytearray, RLE_image_bytearray2)
+        #decoded = run_length_decode(RLE_image_bytearray)
+        #decoded2 = run_length_decode(RLE_image_bytearray2)
+        #print(f'{decoded}')
+        #print(f'{decoded2}')
+
+        #bytearray_compare(image_bytearray, decoded)
+        #bytearray_compare(image_bytearray, decoded2)
+
+        #print(f"wavesharebuf size: {len(wavesharebuf)} RLE size: {len(RLE_wavesharebuf)}")
+        #print(f"image_bytes size: {len(image_bytes)} RLE size: {len(RLE_image_bytes)}")
+        print(f"image_bytearray size: {len(image_bytearray)} RLE size: {len(RLE_image_bytearray)}")
+
+        #if(pcp):
+        #if(test == 0):
+        #print("Sending image through serial port...", end='')
+        #pcp.write(wavesharebuf)
+        #print("done")
+
+        #device_connected=1
+        #if(device_connected):
+
+        #test = bytearray([255] * 510)
+        #print(f"test length: {len(test)}\n")
+        #print(f"test data: {test}\n")
+        
+        #encode_test = run_length_encode2(test)
+        #print(f"encoded test length:{len(encode_test)}\n")
+        #print(f"encoded test data: {encode_test}\n")
+
+        #decode_test = run_length_decode(encode_test)
+        #print(f"decoded test length:{len(decode_test)}\n")
+        #print(f"decoded test: {decode_test}\n")
+        await send_bytes_to_client(RLE_image_bytearray)
+
+    # Define an async function to send a message to the device
+    async def send_bytes_to_client(databytes):
+        global response_received
+        global bytes_received
+
+        max_retries = 5
+        timeout_ms = 1000
+        bytes_received = 0
+
+        try:
+            image_size = len(run_length_decode(databytes))
+            # Check if the BleakClient object is available globally
+            if "client" in globals():
+                await client.connect()
+
+                
+                # Check if the client is connected
+                if client.is_connected:
+                    await client.start_notify(TX_FIFO_UUID, notification_handler)
+
+                    print("Sending data to BLE Client")
+                    image_bytes_sent = 0
+                    #or i in range(0, len(databytes), 20):
+                    while bytes_received < len(databytes):
+                        #chunk = databytes[i:i+20]
+                        if bytes_received+20 < len(databytes):
+                            chunk = databytes[bytes_received:bytes_received+20]
+                        else:
+                            chunk = databytes[bytes_received:]
+
+                        decoded_chunk = run_length_decode(chunk)
+                        image_bytes_sent = image_bytes_sent + len(decoded_chunk)
+                        retries = 0 #initialize retries for each chunk
+
+                        while retries < max_retries:
+                            try:
+                                # Wait for the acknowledgment before proceeding
+                                response_received = False  # Reset flag before waiting
+                                                            
+                                # Send the message to the RXUUID of the Bluetooth device
+                                await client.write_gatt_char(RX_FIFO_UUID, chunk)
+                                
+                                print(f"Transmitted: {bytes_received+len(chunk)}/{len(databytes)} bytes. Expanded: {image_bytes_sent}/{image_size}")
+                                
+                                try:
+                                    await asyncio.wait_for(wait_for_response(), timeout_ms / 1000)
+                                    if response_received:
+                                        print(f"Client has received:{bytes_received} bytes")
+                                        break
+                                except asyncio.TimeoutError:
+                                    print(f"No response received within {timeout_ms}ms, retrying... (Attempt {retries+1}/{max_retries})")
+                                    retries += 1  # Increment retries if timeout occurs
+                                
+                            except Exception as e:
+                                print(f"Error sending chunk: {e}")
+                                retries += 1  # Increment retries on exception
+                        
+                        if retries == max_retries:
+                            print(f"Max retries reached for chunk. Aborting.")
+                            break
+
+                    print("Data transmission complete\n")
+
+                    # Stop notifications when done
+                    # await client.stop_notify(RX_FIFO_UUID)
+
+                    await client.disconnect()
+                    return  # Exit function after successful transmission
+
+                else:
+                    print("Device is not connected.")
+
+        except Exception as e:
+            print(f"Error sending message to device: {e}")
 
     def _on_mouse_wheel(self, event):
         self.left_canvas.yview_scroll(int(-1*(event.delta/120)), "units")
@@ -191,15 +318,10 @@ class App(customtkinter.CTk):
         #    entry.pack(anchor='w', padx=10, pady=5)
             #entry.insert(0, getattr(img.preset, field, ''))
 
-        
-
-    def change_bg_color(self, label):
-        label.config(bg="white")
-        label.update()
-
-    async def refresh(self):
+    def refresh(self):
         print("Refreshing...")
-        await self.scan_for_devices()
+        asyncio.run_coroutine_threadsafe(self.scan_for_devices(), self.loop)
+        #asyncio.run(self.scan_for_devices())
 
     # Define a function to scan for BLE devices
     async def scan_for_devices(self):
@@ -217,13 +339,25 @@ class App(customtkinter.CTk):
             print("Available devices:")
             for i, device in enumerate(self.named_bt_devices_found):
                 print(f"{i + 1}. {device.name} - {device.address}")
-                self.dropdown_menu['values'] = [device.name for device in self.named_bt_devices_found]
+                self.dropdown_menu.configure(values = [device.name for device in self.named_bt_devices_found])
 
 
 
         except Exception as e:
             print(f"Error during scan: {e}")
             return []
+        
+    def run_event_loop(self):
+        asyncio.set_event_loop(self.loop)
+        self.loop.run_forever()
+
+    #def start_async_task(self):
+        #asyncio.run_coroutine_threadsafe(self.handle_async_task(), self.loop)
+    
+    #async def handle_async_task(self):
+        #self.label.configure(text="Running...")
+        #result = await self.async_task()
+        #self.label.configure(text=result)
         
 
 if __name__ == "__main__":
