@@ -20,6 +20,10 @@
         },
         {
             "module":"template_image_full",
+            "image_filename": "SVG Art/mario-face.svg"
+        },
+        {
+            "module":"template_image_full",
             "image_filename": "SVG Art/Aperture_Science.svg"
         },
         {
