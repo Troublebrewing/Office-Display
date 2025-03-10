@@ -70,13 +70,13 @@ class App(customtkinter.CTk):
         self.duplicate_button = customtkinter.CTkButton(self.control_frame, text=None, image=self.duplicate_button_image, command=self.refresh)
         self.duplicate_button.pack(side=tk.LEFT, padx=10, pady=10)
 
-        self.remove_button_image = ImageTk.PhotoImage(Image.open("icons/delete.png").resize((20, 20)))
-        self.remove_button = customtkinter.CTkButton(self.control_frame, text=None, image=self.remove_button_image, command=self.refresh)
-        self.remove_button.pack(side=tk.LEFT, padx=10, pady=10)
+        #self.remove_button_image = ImageTk.PhotoImage(Image.open("icons/delete.png").resize((20, 20)))
+        #self.remove_button = customtkinter.CTkButton(self.control_frame, text=None, image=self.remove_button_image, command=self.refresh)
+        #self.remove_button.pack(side=tk.LEFT, padx=10, pady=10)
 
-        self.add_button_image = ImageTk.PhotoImage(Image.open("icons/add.png").resize((20, 20)))
-        self.add_button = customtkinter.CTkButton(self.control_frame, text=None, image=self.add_button_image, command=self.refresh)
-        self.add_button.pack(side=tk.LEFT, padx=10, pady=10)
+        #self.add_button_image = ImageTk.PhotoImage(Image.open("icons/add.png").resize((20, 20)))
+        #self.add_button = customtkinter.CTkButton(self.control_frame, text=None, image=self.add_button_image, command=self.refresh)
+        #self.add_button.pack(side=tk.LEFT, padx=10, pady=10)
 
         self.upload_button = customtkinter.CTkButton(self.control_frame, text="Upload", command=self.upload)
         self.upload_button.pack(side=tk.RIGHT, padx=10, pady=10)
@@ -172,6 +172,7 @@ class App(customtkinter.CTk):
             print(f"Unable to open presets.json file: {e}")
 
         self.preset_list = []
+        #import importlib
 
         if presets_data is not None:
             for preset_info in presets_data['presets']:
@@ -179,6 +180,11 @@ class App(customtkinter.CTk):
                     module_name = preset_info['module']
                     class_name = module_name                    
 
+                    #module_path = f"templates.{module_name}"
+                    # Import module
+                    #module = importlib.import_module(module_path)
+
+                    #module_name = f"templates.{module_name}"
                     #import module
                     module = __import__(module_name)
                     
