@@ -9,14 +9,14 @@
             "name": "Tyler Bules",
             "title": "Electrical Engineering Manager",
             "badge": "SVG Art/Dixon Logo Mono (No Tagline).svg",
-            "banner_text": "Welcome Jim Bansbach"        
+            "status": "Available"        
         },
         {
             "module": "template_status",
             "name": "Tyler Bules",
             "title": "Electrical Engineering Manager",
             "badge": "SVG Art/Dixon Logo Mono (No Tagline).svg",
-            "status": "Available"        
+            "status": "Out of Office"        
         },
         {
             "module":"template_image_full",

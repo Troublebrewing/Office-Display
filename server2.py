@@ -27,21 +27,49 @@ class App(customtkinter.CTk):
         self.ble_services = BLE_SERVICES()
         
         #self.root = root
-        self.geometry("1020x560")        
+        self.geometry("1020x580")        
         self.title("Epaper Display Manager")
         self.grid_columnconfigure(0, weight=1, uniform="group1")
         self.grid_columnconfigure(1, weight=4, uniform="group1")
-        self.grid_rowconfigure(1, weight=1)
-        self.maxsize(1020,560)
+        self.grid_rowconfigure(0, weight=1)
+        self.maxsize(1020,580)
 
-        # add widgets onto the frame...
-        self.label = customtkinter.CTkLabel(self, text="Presets:")
+        #left frame so we can modify contents without affecting the right frame
+        self.left_frame = customtkinter.CTkFrame(self)
+        self.left_frame.grid(row=0, column=0, padx=0, pady=0, sticky="nsew")
+        self.left_frame.grid_columnconfigure(0, weight=1)
+        self.left_frame.grid_rowconfigure(1, weight=1)
+
+        # Preset text at top
+        self.label = customtkinter.CTkLabel(self.left_frame, text="Presets:")
         self.label.grid(row=0, column=0, padx=0, pady=0, sticky="nsew")
         
-        # Left frame for presets
-        self.preset_list_frame = PresetListFrame(self) #frame will grow or shrink to size of widgets within frame
+        # scrollable preset list
+        self.preset_list_frame = PresetListFrame(self.left_frame) #frame will grow or shrink to size of widgets within frame
         self.preset_list_frame.grid(row=1, column=0, ipadx=0, padx=0, pady=0, sticky="nsew")
         
+        #frame for buttons below scrollable frame
+        self.preset_button_frame = customtkinter.CTkFrame(self.left_frame)
+        self.preset_button_frame.grid(row=2, column=0, padx=0, pady=0, sticky="nsew")
+        self.preset_button_frame.grid_columnconfigure(0, weight=1, uniform="group2")
+        self.preset_button_frame.grid_columnconfigure(1, weight=1, uniform="group2")
+        self.preset_button_frame.grid_columnconfigure(2, weight=1, uniform="group2")
+
+        #duplicate button
+        self.duplicate_button_image = ImageTk.PhotoImage(Image.open("icons/copy.png").resize((20, 20)))
+        self.duplicate_button = customtkinter.CTkButton(self.preset_button_frame, text=None, image=self.duplicate_button_image, command=self.refresh)
+        self.duplicate_button.grid(row=0, column=0, padx=0, pady=0, sticky="nsew")
+
+        #remove button
+        self.remove_button_image = ImageTk.PhotoImage(Image.open("icons/delete.png").resize((20, 20)))
+        self.remove_button = customtkinter.CTkButton(self.preset_button_frame, text=None, image=self.remove_button_image, command=self.refresh)
+        self.remove_button.grid(row=0, column=1, padx=0, pady=0, sticky="nsew")
+
+        #add button
+        self.add_button_image = ImageTk.PhotoImage(Image.open("icons/add.png").resize((20, 20)))
+        self.add_button = customtkinter.CTkButton(self.preset_button_frame, text=None, image=self.add_button_image, command=self.refresh)
+        self.add_button.grid(row=0, column=2, padx=0, pady=0, sticky="nsew")
+
         # Right frame for image display and buttons
         self.right_frame = customtkinter.CTkFrame(self)
         self.right_frame.grid(row=0, column=1, padx=0, pady=0, rowspan=2, sticky="nsew")
@@ -61,32 +89,25 @@ class App(customtkinter.CTk):
         # Buttons below the image
         self.control_frame = customtkinter.CTkFrame(self.right_frame, fg_color="transparent")
         self.control_frame.grid(row=1, column=0, padx=0, pady=0, sticky="ew")
+        self.control_frame.grid_columnconfigure(1, weight=1)
 
         self.refresh_button_image = ImageTk.PhotoImage(Image.open("icons/refresh.png").resize((20, 20)))
         self.refresh_button = customtkinter.CTkButton(self.control_frame, text=None, image=self.refresh_button_image, command=self.refresh)
-        self.refresh_button.pack(side=tk.LEFT, padx=10, pady=10)
-
-        self.duplicate_button_image = ImageTk.PhotoImage(Image.open("icons/copy.png").resize((20, 20)))
-        self.duplicate_button = customtkinter.CTkButton(self.control_frame, text=None, image=self.duplicate_button_image, command=self.refresh)
-        self.duplicate_button.pack(side=tk.LEFT, padx=10, pady=10)
-
-        #self.remove_button_image = ImageTk.PhotoImage(Image.open("icons/delete.png").resize((20, 20)))
-        #self.remove_button = customtkinter.CTkButton(self.control_frame, text=None, image=self.remove_button_image, command=self.refresh)
-        #self.remove_button.pack(side=tk.LEFT, padx=10, pady=10)
-
-        #self.add_button_image = ImageTk.PhotoImage(Image.open("icons/add.png").resize((20, 20)))
-        #self.add_button = customtkinter.CTkButton(self.control_frame, text=None, image=self.add_button_image, command=self.refresh)
-        #self.add_button.pack(side=tk.LEFT, padx=10, pady=10)
+        self.refresh_button.grid(row=0, column=0, padx=10, pady=10, sticky="ew")
 
         self.upload_button = customtkinter.CTkButton(self.control_frame, text="Upload", command=self.upload)
-        self.upload_button.pack(side=tk.RIGHT, padx=10, pady=10)
+        self.upload_button.grid(row=0, column=3, padx=10, pady=0, sticky="ew")
 
         self.selected_bt_device = customtkinter.StringVar(self.control_frame) 
         #self.dropdown_var.set("Option 1")  # default value
 
         self.dropdown_menu = customtkinter.CTkComboBox(self.control_frame, variable=self.selected_bt_device, state="readonly")
-        self.dropdown_menu.pack(side=tk.RIGHT, padx=10, pady=10)
-        
+        self.dropdown_menu.grid(row=0, column=2, padx=10, pady=10, sticky="ew")
+
+        self.upload_progressbar = customtkinter.CTkProgressBar(self.control_frame, orientation="horizontal")
+        self.upload_progressbar.grid(row=1, column=3, padx=10, pady=0, sticky="ew")
+        self.upload_progressbar.set(0)
+
         # Load thumbnails and bind listbox selection        
         self.load_presets()
 
@@ -158,7 +179,7 @@ class App(customtkinter.CTk):
         #print(f"decoded test: {decode_test}\n")
 
         #asyncio.run_coroutine_threadsafe(self.ble_services.send_bytes_to_client(databytes=RLE_image_bytearray, client_name=self.selected_bt_device), self.loop)
-        asyncio.run_coroutine_threadsafe(self.ble_services.send_bytes_to_client(databytes=RLE_image_bytearray, client_name=self.dropdown_menu.get()), self.loop)
+        asyncio.run_coroutine_threadsafe(self.ble_services.send_bytes_to_client(databytes=RLE_image_bytearray, client_name=self.dropdown_menu.get(), progressbar=self.upload_progressbar), self.loop)
         #await self.send_bytes_to_client(RLE_image_bytearray) 
 
     def _on_mouse_wheel(self, event):
@@ -346,7 +367,7 @@ class BLE_SERVICES:
         self.client = client
 
     # Define an async function to send a message to the device
-    async def send_bytes_to_client(self, databytes, client_name=None):
+    async def send_bytes_to_client(self, databytes, client_name=None, progressbar=None):
         global response_received
         global bytes_received
 
@@ -392,10 +413,16 @@ class BLE_SERVICES:
                                 
                                 print(f"Transmitted: {bytes_received+len(chunk)}/{len(databytes)} bytes. Expanded: {image_bytes_sent}/{image_size}")
                                 
+                                if progressbar != None:
+                                    #update progress bar
+                                    progressbar.set((bytes_received/len(databytes)))
+                                
                                 try:
                                     await asyncio.wait_for(self.wait_for_response(), timeout_ms / 1000)
                                     if response_received:
                                         print(f"Client has received:{bytes_received} bytes")
+
+                                        
                                         break
                                 except asyncio.TimeoutError:
                                     print(f"No response received within {timeout_ms}ms, retrying... (Attempt {retries+1}/{max_retries})")
