@@ -56,17 +56,17 @@ class App(customtkinter.CTk):
         self.preset_button_frame.grid_columnconfigure(2, weight=1, uniform="group2")
 
         #duplicate button
-        self.duplicate_button_image = ImageTk.PhotoImage(Image.open("icons/copy.png").resize((20, 20)))
+        self.duplicate_button_image = customtkinter.CTkImage(light_image=Image.open("icons/copy.png"), dark_image=Image.open("icons/copy.png"), size=(20, 20))
         self.duplicate_button = customtkinter.CTkButton(self.preset_button_frame, text=None, image=self.duplicate_button_image, command=self.refresh)
         self.duplicate_button.grid(row=0, column=0, padx=0, pady=0, sticky="nsew")
 
         #remove button
-        self.remove_button_image = ImageTk.PhotoImage(Image.open("icons/delete.png").resize((20, 20)))
+        self.remove_button_image = customtkinter.CTkImage(light_image=Image.open("icons/delete.png"), dark_image=Image.open("icons/delete.png"), size=(20, 20))
         self.remove_button = customtkinter.CTkButton(self.preset_button_frame, text=None, image=self.remove_button_image, command=self.refresh)
         self.remove_button.grid(row=0, column=1, padx=0, pady=0, sticky="nsew")
 
         #add button
-        self.add_button_image = ImageTk.PhotoImage(Image.open("icons/add.png").resize((20, 20)))
+        self.add_button_image = customtkinter.CTkImage(light_image=Image.open("icons/add.png"), dark_image=Image.open("icons/add.png"), size=(20, 20))
         self.add_button = customtkinter.CTkButton(self.preset_button_frame, text=None, image=self.add_button_image, command=self.refresh)
         self.add_button.grid(row=0, column=2, padx=0, pady=0, sticky="nsew")
 
@@ -91,7 +91,7 @@ class App(customtkinter.CTk):
         self.control_frame.grid(row=1, column=0, padx=0, pady=0, sticky="ew")
         self.control_frame.grid_columnconfigure(1, weight=1)
 
-        self.refresh_button_image = ImageTk.PhotoImage(Image.open("icons/refresh.png").resize((20, 20)))
+        self.refresh_button_image = customtkinter.CTkImage(light_image=Image.open("icons/refresh.png"), dark_image=Image.open("icons/refresh.png"), size=(20, 20))
         self.refresh_button = customtkinter.CTkButton(self.control_frame, text=None, image=self.refresh_button_image, command=self.refresh)
         self.refresh_button.grid(row=0, column=0, padx=10, pady=10, sticky="ew")
 
@@ -113,7 +113,10 @@ class App(customtkinter.CTk):
 
         self.draw_ui_preset_list()
 
-        self.selected_preset = self.preset_list[0]
+        #self.selected_preset = self.preset_list[0]
+        #event = tk.Event()
+        #event.widget = self.preset_list_frame.winfo_children()[0]
+        #self.thumbnail_select(event)
         
         # Start the asyncio event loop integration
         self.loop = asyncio.new_event_loop()
@@ -244,8 +247,11 @@ class App(customtkinter.CTk):
             
             #img = Image.open(thumbnail_file)
             thumbnail_img = preset.im.copy()
-            thumbnail_img.thumbnail((left_frame_width-(2*padding), left_frame_width-(2*padding)))
-            thumbnail_img = ImageTk.PhotoImage(thumbnail_img)
+            thumbnail_width = left_frame_width-(2*padding)
+            thumbnail_img.aspect_ratio = thumbnail_img.width / thumbnail_img.height
+            thumbnail_height = int(thumbnail_width / thumbnail_img.aspect_ratio)            
+            #thumbnail_img.thumbnail((thumbnail_width, thumbnail_height))
+            thumbnail_img = customtkinter.CTkImage(light_image=thumbnail_img, dark_image=thumbnail_img, size=(thumbnail_width, thumbnail_height))
             #self.image_list.append(img)
             #self.thumbnail_list.append(thumbnail_img)
             label = customtkinter.CTkLabel(self.preset_list_frame, image=thumbnail_img, compound="top", width=left_frame_width, height=120, padx=10, pady=0)
@@ -280,17 +286,20 @@ class App(customtkinter.CTk):
         self.canvas.image = img
 
         #erase all widgets in customize tab
-        #for widget in self.tabControl.tab("Customize").winfo_children():
-        #    widget.destroy()
+        for widget in self.tabControl.tab("Customize").winfo_children():
+            widget.destroy()
 
         #render configurable fields into customize tab
-        #preset_fields = img.preset.fields
+        preset_fields = self.selected_preset.fields
         #preset_fields = ['name', 'title', 'badge', 'status', 'banner_text']
-        #for field in preset_fields:
-        #    label = customtkinter.CTkLabel(self.tabControl.tab("Customize"), text=field)
-        #    label.pack(anchor='w', padx=10, pady=5)
-        #    entry = customtkinter.CTkEntry(self.tabControl.tab("Customize"))
-        #    entry.pack(anchor='w', padx=10, pady=5)
+        for field in preset_fields:
+            label = customtkinter.CTkLabel(self.tabControl.tab("Customize"), text=field)
+            label.pack(anchor='w', padx=10, pady=5)
+            entry = customtkinter.CTkEntry(self.tabControl.tab("Customize"))
+            entry.insert(0, getattr(self.selected_preset, field, ''))
+
+            entry.pack(anchor='w', padx=10, pady=5)
+            
             #entry.insert(0, getattr(img.preset, field, ''))
 
     def refresh(self):

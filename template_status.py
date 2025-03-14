@@ -18,14 +18,15 @@ from svglib.svglib import svg2rlg
 from reportlab.graphics import renderPM
 
 class template_status:
-    def __init__(self, name="Dixon Dan", title="Head Honcho", badge="", status="Available", banner_text=""):
+    def __init__(self, name="Dixon Dan", title="Head Honcho", badge_filename="", status="Available", status_color="", banner_text=""):
         self.name = name
         self.title = title
-        self.badge = badge
+        self.badge_filename = badge_filename
         self.status = status
+        self.status_color = status_color
         self.banner_text = banner_text
     
-    fields = ['name', 'title', 'badge', 'status', 'banner_text']
+    fields = ['name', 'title', 'badge_filename', 'status', 'status_color', 'banner_text']
 
     def render(self):
         display_width = 800
@@ -45,13 +46,29 @@ class template_status:
         EPD_YELLOW  = 0x00FFFF
         EPD_ORANGE  = 0x007DFF
         
-        bordercolor = "white"
-        if self.status == "Focus":
-            bordercolor = EPD_YELLOW
-        if (self.status == "Busy") or (self.status == "Out of Office"):
-            bordercolor = EPD_RED
-        if self.status == "Available":
-            bordercolor = EPD_GREEN
+        #if color is specified, use that
+        if self.status_color != "":
+            bordercolor = self.status_color
+            statuscolor = self.status_color
+        else:
+            #color not specified
+            # look for keywords in status              
+            if self.status == "Focus":
+                bordercolor = EPD_YELLOW
+                statuscolor = EPD_YELLOW
+            elif (self.status == "Busy") or (self.status == "Out of Office"):
+                bordercolor = EPD_RED
+                statuscolor = EPD_RED
+            elif self.status == "Available":
+                bordercolor = EPD_GREEN
+                statuscolor = EPD_GREEN
+            else:
+                # no color specified and no keywords found
+                # default colors
+                bordercolor = EPD_WHITE
+                statuscolor = EPD_BLACK 
+        
+        
 
         #outline
         borderwidth = 20
@@ -67,18 +84,14 @@ class template_status:
         timestring = now.strftime("%x")
         self.im2.text((borderwidth+padding, padding+borderwidth), timestring, font=timefont, fill=(0, 0, 0))
 
-        if self.badge != "":
+        if self.badge_filename != "":
             try:
-                vector_badge = svg2rlg(self.badge)
-                renderPM.drawToFile(vector_badge, "badge.png", fmt="PNG", dpi=100)
-            except:
-                print("unable to create badge from vector image")
-
-            try:
-                self.badge = Image.open("badge.png")
+                vector_badge = svg2rlg(self.badge_filename)
+                self.badge = renderPM.drawToPIL(vector_badge, dpi=100)
+                self.badge = self.badge.convert("RGBA")
                 aspect_ratio = self.badge.width / self.badge.height
-            except:
-                print("no badge image file found")
+            except Exception as e:
+                print(f"unable to create badge from vector image {e}")
 
         if self.status != "Away":  
             #badge
@@ -131,7 +144,7 @@ class template_status:
             status_y_anchor = 280
             statusfont2_size = 120
             #statusfont2 = ImageFont.truetype('Inter/static/Inter-Bold.ttf', statusfont2_size)
-            statuscolor = bordercolor
+            #statuscolor = bordercolor
             #boundingbox = im2.textbbox((borderwidth+padding, status_y_anchor), status.upper(), font=statusfont2)
             #anchor = (display_width/2)-((boundingbox[2]-boundingbox[0])/2)
             #im2.text((anchor , status_y_anchor), "FRIDAY", font=statusfont2, fill=statuscolor)

@@ -8,15 +8,16 @@
             "module": "template_status",
             "name": "Tyler Bules",
             "title": "Electrical Engineering Manager",
-            "badge": "SVG Art/Dixon Logo Mono (No Tagline).svg",
+            "badge_filename": "SVG Art/Dixon Logo Mono (No Tagline).svg",
             "status": "Available"        
         },
         {
             "module": "template_status",
             "name": "Tyler Bules",
             "title": "Electrical Engineering Manager",
-            "badge": "SVG Art/Dixon Logo Mono (No Tagline).svg",
-            "status": "Out of Office"        
+            "badge_filename": "SVG Art/Dixon Logo Mono (No Tagline).svg",
+            "status": "T.G.I.F.", 
+            "status_color": "blue"     
         },
         {
             "module":"template_image_full",
