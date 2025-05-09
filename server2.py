@@ -105,7 +105,7 @@ class App(customtkinter.CTk):
         self.dropdown_menu.grid(row=0, column=2, padx=10, pady=10, sticky="ew")
 
         self.upload_progressbar = customtkinter.CTkProgressBar(self.control_frame, orientation="horizontal")
-        self.upload_progressbar.grid(row=1, column=3, padx=10, pady=0, sticky="ew")
+        self.upload_progressbar.grid(row=1, column=3, padx=10, pady=2, sticky="ew")
         self.upload_progressbar.set(0)
 
         # Load thumbnails and bind listbox selection        
@@ -281,6 +281,15 @@ class App(customtkinter.CTk):
 
         #render full size image into preview tab
         self.selected_preset.render()
+        
+        #self.canvas.create_image(0, 0, anchor=tk.NW, image=img)
+        #self.canvas.image = img
+
+        # Create a pallette with the 7 colors supported by the panel
+        pal_image = Image.new("P", (1,1))
+        pal_image.putpalette( (0,0,0,  255,255,255,  0,255,0,   0,0,255,  255,0,0,  255,255,0, 255,128,0) + (0,0,0)*249)
+        self.selected_preset.im = self.selected_preset.im.convert("RGB").quantize(palette=pal_image)
+        
         img=ImageTk.PhotoImage(self.selected_preset.im)
         self.canvas.create_image(0, 0, anchor=tk.NW, image=img)
         self.canvas.image = img

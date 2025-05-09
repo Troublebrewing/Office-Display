@@ -15,9 +15,39 @@
             "module": "template_status",
             "name": "Tyler Bules",
             "title": "Electrical Engineering Manager",
+            "badge_filename": "SVG Art/Cincinnati_Bearcats_logo.svg",
+            "status": "Available"        
+        },        
+        {
+            "module": "template_status",
+            "name": "Tyler Bules",
+            "title": "Electrical Engineering Manager",
+            "badge_filename": "SVG Art/Dixon Logo Mono (No Tagline).svg",
+            "banner_text": "I BLESS THE RAINS DOWN IN AFRICA"       
+        },
+        {
+            "module": "template_status",
+            "name": "Tyler Bules",
+            "title": "Electrical Engineering Manager",
             "badge_filename": "SVG Art/Dixon Logo Mono (No Tagline).svg",
             "status": "T.G.I.F.", 
             "status_color": "blue"     
+        },
+        {
+            "module": "template_status",
+            "name": "Tyler Bules",
+            "title": "Electrical Engineering Manager",
+            "badge_filename": "SVG Art/lumon.svg",
+            "banner_text": "Outie",
+            "status_color": "red"   
+        },
+        {
+            "module": "template_status",
+            "name": "Tyler Bules",
+            "title": "Electrical Engineering Manager",
+            "badge_filename": "SVG Art/Three Leaf Clover.svg",
+            "banner_text": "HAPPY ST PATRICKS DAY",
+            "status_color": "green"   
         },
         {
             "module":"template_image_full",
