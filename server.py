@@ -323,7 +323,7 @@ class App(customtkinter.CTk):
         print("Available devices:")
         for i, device in enumerate(self.ble_services.named_bt_devices_found):
             print(f"{i + 1}. {device.name} - {device.address}")
-            self.dropdown_menu.configure(values = [device.name for device in self.ble_services.named_bt_devices_found])
+            self.dropdown_menu.configure(values = [f"{device.name} - {device.address}" for device in self.ble_services.named_bt_devices_found])
         
     def run_event_loop(self):
         asyncio.set_event_loop(self.loop)
@@ -489,11 +489,11 @@ class BLE_SERVICES:
         
     def set_client(self, client_name):
         for device in self.named_bt_devices_found:
-            if device.name == client_name:
+            if f"{device.name} - {device.address}" == client_name:
                 self.client = BleakClient(device)
 
-            print(f'Client set to {device.name}')
-            break
+                print(f'Client set to {device.name}')
+                break
 
     def run_length_decode(self, data):
         # Initialize an empty result list

@@ -17,6 +17,14 @@
             "title": "Electrical Engineering Manager",
             "badge_filename": "SVG Art/Cincinnati_Bearcats_logo.svg",
             "status": "Available"        
+        },
+        {
+            "module": "template_status",
+            "name": "Tyler Bules",
+            "title": "Electrical Engineering Manager",
+            "badge_filename": "SVG Art/Maple_Leaf.svg",
+            "status": "CANADA",
+            "status_color": "red"         
         },        
         {
             "module": "template_status",
